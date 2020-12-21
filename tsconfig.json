@@ -1,0 +1,14 @@
+{
+  "extends": "@whatasoda/tsconfig",
+  "compilerOptions": {
+    "rootDir": "./",
+    "target": "ES6",
+    "resolveJsonModule": true,
+    "typeRoots": [
+      "node_modules/@types",
+      "src-ts/types",
+    ]
+  },
+  "include": ["**/*"],
+  "exclude": ["node_modules"]
+}
