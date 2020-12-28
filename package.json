@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "webpack serve --config scripts/webpack/dev.config.js",
+    "wasm": "wasm-pack build .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
