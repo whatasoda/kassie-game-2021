@@ -1,12 +1,14 @@
 mod geometry;
+mod shader;
 mod utils;
 
-use crate::geometry::ShaderProgram;
-use webgl_matrix::Vec4;
+use crate::shader::ext::{AngleInstancedArrays, ExtensionGetter};
+use crate::shader::Shader;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::WebGlRenderingContext;
+use webgl_matrix::Vec4;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -40,11 +42,9 @@ pub fn start() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<WebGlRenderingContext>()?;
 
-    let shader = ShaderProgram::<Vertex, ()>::new(
-        &ctx,
+    let mut shader = Shader::<Vertex, ()>::new(&ctx);
+    shader.compile(
         vec!["position"],
-        vec![],
-        vec![("position", 4)],
         vec![],
         r#"
         attribute vec4 position;
@@ -58,7 +58,8 @@ pub fn start() -> Result<(), JsValue> {
         }
         "#,
     )?;
-    ctx.use_program(Some(&shader.program));
+    let ext_angle = AngleInstancedArrays::get(&ctx)?;
+    shader.set_vertex_layout(&ext_angle, vec![("position", 4)])?;
 
     let vertices = vec![
         Vertex {
@@ -72,13 +73,14 @@ pub fn start() -> Result<(), JsValue> {
         },
     ];
     unsafe {
-        shader.vertex_buffer_data(&ctx, &vertices);
+        shader.vertex_buffer_data(&vertices);
     }
 
     ctx.clear_color(0.0, 0.0, 0.0, 1.0);
     ctx.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
 
+    ctx.use_program(shader.program.program.as_ref());
     ctx.draw_arrays(WebGlRenderingContext::TRIANGLES, 0, vertices.len() as i32);
-    vertices.len();
+
     Ok(())
 }
