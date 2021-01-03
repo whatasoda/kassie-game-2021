@@ -27,6 +27,17 @@ module.exports = merge({
         test: /\.tsx?$/,
         use: [{ loader: 'ts-loader', options: { transpileOnly: true } }],
       },
+      {
+        test: /\.(png|jpe?g|gif)/,
+        use: [
+          {
+            loader: 'file-loader',
+            options: {
+              name: '[name].[ext]',
+            },
+          },
+        ],
+      },
     ],
   },
 });
