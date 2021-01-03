@@ -1,6 +1,6 @@
 use super::Shader;
 use std::collections::HashMap;
-use web_sys::{WebGlProgram, WebGlRenderingContext, WebGlShader, WebGlUniformLocation};
+use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
 
 impl<V, I> Shader<'_, V, I> {
     pub fn compile(
@@ -13,8 +13,8 @@ impl<V, I> Shader<'_, V, I> {
         if self.program.program.is_some() {
             return Err(String::from("instance has already used for another shader"));
         }
-        let vert = compile_shader(self.ctx, WebGlRenderingContext::VERTEX_SHADER, vert)?;
-        let frag = compile_shader(self.ctx, WebGlRenderingContext::FRAGMENT_SHADER, frag)?;
+        let vert = compile_shader(self.ctx, WebGl2RenderingContext::VERTEX_SHADER, vert)?;
+        let frag = compile_shader(self.ctx, WebGl2RenderingContext::FRAGMENT_SHADER, frag)?;
         let program = link_program(self.ctx, &vert, &frag)?;
         collect_attrib_locations(
             self.ctx,
@@ -50,7 +50,7 @@ impl Program {
 }
 
 fn compile_shader(
-    ctx: &WebGlRenderingContext,
+    ctx: &WebGl2RenderingContext,
     shader_type: u32,
     source: &str,
 ) -> Result<WebGlShader, String> {
@@ -61,7 +61,7 @@ fn compile_shader(
     ctx.compile_shader(&shader);
 
     if ctx
-        .get_shader_parameter(&shader, WebGlRenderingContext::COMPILE_STATUS)
+        .get_shader_parameter(&shader, WebGl2RenderingContext::COMPILE_STATUS)
         .as_bool()
         .unwrap_or(false)
     {
@@ -74,7 +74,7 @@ fn compile_shader(
 }
 
 fn link_program(
-    ctx: &WebGlRenderingContext,
+    ctx: &WebGl2RenderingContext,
     vert_shader: &WebGlShader,
     frag_shader: &WebGlShader,
 ) -> Result<WebGlProgram, String> {
@@ -87,7 +87,7 @@ fn link_program(
     ctx.link_program(&program);
 
     if ctx
-        .get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS)
+        .get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
         .as_bool()
         .unwrap_or(false)
     {
@@ -100,7 +100,7 @@ fn link_program(
 }
 
 fn collect_attrib_locations<'a>(
-    ctx: &WebGlRenderingContext,
+    ctx: &WebGl2RenderingContext,
     acc: &mut HashMap<&'a str, u32>,
     program: &WebGlProgram,
     attirbutes: &Vec<&'a str>,
@@ -117,7 +117,7 @@ fn collect_attrib_locations<'a>(
 }
 
 fn collect_uniform_locations<'a>(
-    ctx: &WebGlRenderingContext,
+    ctx: &WebGl2RenderingContext,
     acc: &mut HashMap<&'a str, WebGlUniformLocation>,
     program: &WebGlProgram,
     uniforms: &Vec<&'a str>,

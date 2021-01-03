@@ -12,6 +12,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 wasm-bindgen = "0.2.63"
+wasm-bindgen-futures = "0.4.19"
 js-sys = "0.3.46"
 webgl-matrix = "0.1.0"
 
@@ -34,10 +35,12 @@ features = [
   'Document',
   'Element',
   'HtmlCanvasElement',
+  'HtmlImageElement',
   'WebGlBuffer',
-  'WebGlRenderingContext',
+  'WebGl2RenderingContext',
   'WebGlProgram',
   'WebGlShader',
+  'WebGlTexture',
   'WebGlUniformLocation',
   'Window',
 ]

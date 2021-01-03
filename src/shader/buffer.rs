@@ -1,11 +1,10 @@
-use super::ext::AngleInstancedArrays;
 use super::Shader;
 use js_sys::{Float32Array, WebAssembly};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
 use wasm_bindgen::JsCast;
-use web_sys::{WebGlBuffer, WebGlRenderingContext};
+use web_sys::{WebGl2RenderingContext, WebGlBuffer};
 
 const DIVISOR: u32 = 1;
 
@@ -27,28 +26,18 @@ impl<V, I> Shader<'_, V, I> {
         buffer_data(&self.ctx, self.buffers.instance.as_ref(), data, true);
     }
 
-    pub fn set_vertex_layout(
-        &mut self,
-        ext_angle: &AngleInstancedArrays,
-        layout: Vec<(&'static str, i32)>,
-    ) -> Result<(), String> {
+    pub fn set_vertex_layout(&mut self, layout: Vec<(&'static str, i32)>) -> Result<(), String> {
         self.buffers.vertex = Some(create_buffer_with_layout::<V>(
             &self.ctx,
-            &ext_angle,
             &self.program.attrib_locations,
             layout,
             false,
         )?);
         Ok(())
     }
-    pub fn set_instance_layout(
-        &mut self,
-        ext_angle: &AngleInstancedArrays,
-        layout: Vec<(&'static str, i32)>,
-    ) -> Result<(), String> {
+    pub fn set_instance_layout(&mut self, layout: Vec<(&'static str, i32)>) -> Result<(), String> {
         self.buffers.instance = Some(create_buffer_with_layout::<I>(
             self.ctx,
-            &ext_angle,
             &self.program.attrib_locations,
             layout,
             true,
@@ -72,8 +61,7 @@ where
 }
 
 fn create_buffer_with_layout<T>(
-    ctx: &WebGlRenderingContext,
-    ext_angle: &AngleInstancedArrays,
+    ctx: &WebGl2RenderingContext,
     locations: &HashMap<&str, u32>,
     layout: Vec<(&str, i32)>,
     is_instanced: bool,
@@ -82,7 +70,7 @@ where
     T: Sized,
 {
     let buffer = ctx.create_buffer().ok_or("failed to create buffer")?;
-    ctx.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
+    ctx.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
     let mut offset = 0;
     let byte_length = mem::size_of::<T>() as i32;
     let mut iter = layout.into_iter();
@@ -94,13 +82,13 @@ where
         ctx.vertex_attrib_pointer_with_i32(
             *loc,
             stride,
-            WebGlRenderingContext::FLOAT,
+            WebGl2RenderingContext::FLOAT,
             false,
             byte_length,
             offset,
         );
         if is_instanced {
-            ext_angle.vertex_attrib_divisor_angle(*loc, DIVISOR);
+            ctx.vertex_attrib_divisor(*loc, DIVISOR);
         }
         offset += stride << 2;
     }
@@ -111,19 +99,19 @@ where
 }
 
 unsafe fn buffer_data<T>(
-    ctx: &WebGlRenderingContext,
+    ctx: &WebGl2RenderingContext,
     buffer: Option<&WebGlBuffer>,
     vertices: &Vec<T>,
     is_dynamic: bool,
 ) {
-    ctx.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, buffer);
+    ctx.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, buffer);
     ctx.buffer_data_with_array_buffer_view(
-        WebGlRenderingContext::ARRAY_BUFFER,
+        WebGl2RenderingContext::ARRAY_BUFFER,
         &create_array_view(vertices),
         if is_dynamic {
-            WebGlRenderingContext::DYNAMIC_DRAW
+            WebGl2RenderingContext::DYNAMIC_DRAW
         } else {
-            WebGlRenderingContext::STATIC_DRAW
+            WebGl2RenderingContext::STATIC_DRAW
         },
     );
 }
