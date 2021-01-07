@@ -11,9 +11,10 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
+js-sys = "0.3.46"
+num-traits = "0.2.14"
 wasm-bindgen = "0.2.63"
 wasm-bindgen-futures = "0.4.19"
-js-sys = "0.3.46"
 webgl-matrix = "0.1.0"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
@@ -36,8 +37,9 @@ features = [
   'Element',
   'HtmlCanvasElement',
   'HtmlImageElement',
-  'WebGlBuffer',
+  'Performance',
   'WebGl2RenderingContext',
+  'WebGlBuffer',
   'WebGlProgram',
   'WebGlShader',
   'WebGlTexture',

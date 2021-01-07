@@ -1,6 +1,8 @@
+mod scheduler;
 mod shader;
 mod utils;
 
+use crate::scheduler::start_loop;
 use crate::shader::buffer::ConvertArrayView;
 use crate::shader::Shader;
 
@@ -110,29 +112,31 @@ pub async fn start() -> Result<(), JsValue> {
             uv: [1.0, 0.0],
         },
     ];
-    let uniform = Uniform {
+    let mut uniform = Uniform {
         size0: 200.0,
         size1: 0.5,
         _pad0: [0, 0],
     };
 
     ctx.use_program(shader.program.program.as_ref());
-
     shader
         .create_texture(&document, "sample_texture.png")
         .await?;
-    shader.bind_texture(0, "sample_texture.png")?;
 
-    unsafe {
-        shader.vertex_buffer_data(&vertices)?;
-        shader.uniform_buffer_data(&uniform)?;
-    }
-
-    ctx.clear_color(0.0, 0.0, 0.0, 1.0);
-    ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-
-    shader.prepare_draw()?;
-    ctx.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vertices.len() as i32);
+    start_loop(move |now| {
+        ctx.use_program(shader.program.program.as_ref());
+        shader.bind_texture(0, "sample_texture.png")?;
+        uniform.size0 = now / 20.0;
+        unsafe {
+            shader.vertex_buffer_data(&vertices)?;
+            shader.uniform_buffer_data(&uniform)?;
+        }
+        ctx.clear_color(0.0, 0.0, 0.0, 1.0);
+        ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+        shader.prepare_draw()?;
+        ctx.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vertices.len() as i32);
+        Ok(())
+    })?;
 
     Ok(())
 }
