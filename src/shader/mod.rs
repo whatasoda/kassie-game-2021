@@ -1,22 +1,23 @@
-mod buffer;
+pub mod buffer;
 mod compile;
 // pub mod ext;
 mod texture;
 
 use web_sys::WebGl2RenderingContext;
 
-pub struct Shader<'ctx, V, I>
+pub struct Shader<'ctx, V, I, U>
 where
     V: Sized,
     I: Sized,
+    U: Sized,
 {
     ctx: &'ctx WebGl2RenderingContext,
     pub program: compile::Program,
-    buffers: buffer::Buffers<V, I>,
+    buffers: buffer::Buffers<V, I, U>,
     textures: texture::Textures,
 }
 
-impl<'ctx, V, I> Shader<'ctx, V, I> {
+impl<'ctx, V, I, U> Shader<'ctx, V, I, U> {
     pub fn new(ctx: &'ctx WebGl2RenderingContext) -> Self {
         Shader {
             ctx,

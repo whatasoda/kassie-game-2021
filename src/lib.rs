@@ -1,6 +1,7 @@
 mod shader;
 mod utils;
 
+use crate::shader::buffer::ConvertArrayView;
 use crate::shader::Shader;
 
 use wasm_bindgen::prelude::*;
@@ -19,6 +20,14 @@ struct Vertex {
     position: Vec3,
     uv: [f32; 2],
 }
+
+#[repr(C)]
+struct Uniform {
+    size0: f32,
+    size1: f32,
+    _pad0: [u32; 2],
+}
+impl ConvertArrayView for Uniform {}
 
 static mut CTX: Option<WebGl2RenderingContext> = None;
 
@@ -39,10 +48,9 @@ pub async fn start() -> Result<(), JsValue> {
 
     let ctx: &'static WebGl2RenderingContext = unsafe { CTX.as_ref().unwrap() };
 
-    let mut shader = Shader::<Vertex, ()>::new(ctx);
+    let mut shader = Shader::<Vertex, (), Uniform>::new(ctx);
     shader.compile(
         vec!["position", "uv"],
-        vec!["tex"],
         r#"#version 300 es
         layout (location = 0) in vec3 position;
         layout (location = 1) in vec2 uv;
@@ -55,20 +63,25 @@ pub async fn start() -> Result<(), JsValue> {
         }
         "#,
         r#"#version 300 es
-        precision mediump float;
-        uniform sampler2D tex;
+        precision highp float;
+        layout (std140) uniform uniforms_ {
+            float size0;
+            float size1;
+        };
+        uniform sampler2D tex0;
 
         in vec2 v_uv;
 
         out vec4 outColor;
 
         void main() {
-            vec4 tex_color = texture(tex, v_uv); 
-            vec3 rainbow = min((1.0 - tex_color.a) * vec3(gl_FragCoord.xy / 300.0, 0.0), vec3(1.0));
+            vec4 tex_color = texture(tex0, v_uv);
+            vec3 rainbow = min((1.0 - tex_color.a) * vec3(gl_FragCoord.xy / size0 / size1, 0.0), vec3(1.0));
             outColor = vec4((tex_color.xyz * tex_color.a) + rainbow, 1.0);
         }
         "#,
     )?;
+    shader.init_buffers()?;
     shader.set_vertex_layout(vec![("position", 3), ("uv", 2)])?;
 
     let vertices = vec![
@@ -97,9 +110,11 @@ pub async fn start() -> Result<(), JsValue> {
             uv: [1.0, 0.0],
         },
     ];
-    unsafe {
-        shader.vertex_buffer_data(&vertices);
-    }
+    let uniform = Uniform {
+        size0: 200.0,
+        size1: 0.5,
+        _pad0: [0, 0],
+    };
 
     ctx.use_program(shader.program.program.as_ref());
 
@@ -107,11 +122,16 @@ pub async fn start() -> Result<(), JsValue> {
         .create_texture(&document, "sample_texture.png")
         .await?;
     shader.bind_texture(0, "sample_texture.png")?;
-    ctx.uniform1i(shader.program.uniform_locations.get("texture"), 0);
+
+    unsafe {
+        shader.vertex_buffer_data(&vertices)?;
+        shader.uniform_buffer_data(&uniform)?;
+    }
 
     ctx.clear_color(0.0, 0.0, 0.0, 1.0);
     ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
 
+    shader.prepare_draw()?;
     ctx.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vertices.len() as i32);
 
     Ok(())

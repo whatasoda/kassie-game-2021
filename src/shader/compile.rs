@@ -2,11 +2,10 @@ use super::Shader;
 use std::collections::HashMap;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
 
-impl<V, I> Shader<'_, V, I> {
+impl<V, I, U> Shader<'_, V, I, U> {
     pub fn compile(
         &mut self,
         attributes: Vec<&'static str>,
-        uniforms: Vec<&'static str>,
         vert: &str,
         frag: &str,
     ) -> Result<(), String> {
@@ -22,12 +21,7 @@ impl<V, I> Shader<'_, V, I> {
             &program,
             &attributes,
         )?;
-        collect_uniform_locations(
-            self.ctx,
-            &mut self.program.uniform_locations,
-            &program,
-            &uniforms,
-        )?;
+        setup_uniform_block(self.ctx, &program)?;
         self.program.program = Some(program);
         Ok(())
     }
@@ -116,18 +110,52 @@ fn collect_attrib_locations<'a>(
     Ok(())
 }
 
-fn collect_uniform_locations<'a>(
+fn setup_uniform_block<'a>(
     ctx: &WebGl2RenderingContext,
-    acc: &mut HashMap<&'a str, WebGlUniformLocation>,
     program: &WebGlProgram,
-    uniforms: &Vec<&'a str>,
 ) -> Result<(), String> {
-    let mut iter = uniforms.iter();
-    while let Some(name) = iter.next() {
-        let loc = ctx
-            .get_uniform_location(&program, name)
-            .ok_or_else(|| format!("attribute '{}' was not defined with program", name))?;
-        acc.insert(name, loc);
-    }
+    let index = ctx.get_uniform_block_index(program, "uniforms_");
+    ctx.uniform_block_binding(program, index, 0);
     Ok(())
 }
+
+// macro_rules! attrib_definition {
+//     (
+//         $namespace:ident
+//         ---attributes(0, $($v_offset:literal),*)
+//         $(layout (location = $v_loc:literal) in $v_type:ident $v_name:ident);*;
+//         ---instances(0, $($i_offset:literal),*)
+//         $(layout (location = $i_loc:literal) in $i_type:ident $i_name:ident);*;
+//         ---uniforms
+//         $(layout (std140) uniform $u_name:ident {
+//             $($u_item_type:ident $u_item_name:ident);*
+//         });*;
+//     ) => {
+//         mod $namespace {
+//             type vec4 = [f32; 4];
+//             type vec3 = [f32; 3];
+//             type vec2 = [f32; 2];
+//             pub static VERTEX_LAYOUT: &'static [u32] = &[0, $($v_offset,)*];
+//             #[repr(C)]
+//             pub struct Vertex {
+//                 $($v_name: $v_type,)*
+//             }
+//             pub static INSTANCE_LAYOUT: &'static [u32] = &[0, $($i_offset,)*];
+//             #[repr(C)]
+//             pub struct Instance {
+//                 $($i_name: $i_type,)*
+//             }
+//         }
+//     };
+// }
+
+// attrib_definition!(
+//     AA
+//     ---attributes(0, 12)
+//     layout (location = 0) in vec3 position;
+//     layout (location = 1) in vec2 uv;
+//     ---instances(0,)
+//     ;
+//     ---uniforms
+//     ;
+// );
