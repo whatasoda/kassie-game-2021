@@ -1,7 +1,7 @@
 #[macro_use]
 mod macros;
 
-pub mod buffer;
+pub mod array_buffer;
 mod compile;
 mod texture;
 
@@ -15,7 +15,7 @@ where
 {
     ctx: &'ctx WebGl2RenderingContext,
     pub program: compile::Program,
-    buffers: buffer::Buffers<V, I, U>,
+    buffers: array_buffer::ArrayBuffers<V, I, U>,
     textures: texture::Textures,
 }
 
@@ -24,7 +24,7 @@ impl<'ctx, V, I, U> Shader<'ctx, V, I, U> {
         Shader {
             ctx,
             program: compile::Program::empty(),
-            buffers: buffer::Buffers::empty(),
+            buffers: array_buffer::ArrayBuffers::empty(),
             textures: texture::Textures::empty(),
         }
     }

@@ -11,7 +11,7 @@ use web_sys::{WebGl2RenderingContext, WebGlBuffer, WebGlVertexArrayObject};
 
 const DIVISOR: u32 = 1;
 
-pub(super) struct Buffers<V, I, U>
+pub(super) struct ArrayBuffers<V, I, U>
 where
     V: Sized,
     I: Sized,
@@ -24,13 +24,13 @@ where
     uniform: Option<WebGlBuffer>,
 }
 
-impl<V, I, U> Buffers<V, I, U>
+impl<V, I, U> ArrayBuffers<V, I, U>
 where
     V: Sized,
     I: Sized,
 {
     pub fn empty() -> Self {
-        Self {
+        ArrayBuffers {
             _phantom: PhantomData {},
             vao: None,
             vertex: None,
@@ -66,7 +66,7 @@ impl<V, I, U> Shader<'_, V, I, U> {
         if_some: "uniform already exists",
     );
 
-    pub fn init_buffers(&mut self) -> Result<(), String> {
+    pub(super) fn init_buffers(&mut self) -> Result<(), String> {
         self.ensure_vao(None)?;
 
         self.buffers.vao = Some(
@@ -92,6 +92,7 @@ impl<V, I, U> Shader<'_, V, I, U> {
 
     pub unsafe fn vertex_buffer_data(&self, data: &Vec<V>) -> Result<(), String> {
         self.ensure_vao(Some(()))?;
+        self.ensure_vertex(Some(()))?;
 
         self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
         buffer_data(
@@ -107,6 +108,7 @@ impl<V, I, U> Shader<'_, V, I, U> {
 
     pub unsafe fn instance_buffer_data(&self, data: &Vec<I>) -> Result<(), String> {
         self.ensure_vao(Some(()))?;
+        self.ensure_instance(Some(()))?;
 
         self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
         buffer_data(
