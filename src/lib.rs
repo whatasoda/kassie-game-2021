@@ -158,6 +158,7 @@ pub async fn start() -> Result<(), JsValue> {
     start_loop(move |now| {
         shader.activate();
         shader.bind_texture(0, "sample_texture.png")?;
+        shader.attach_texture(0, 0)?;
         uniform.size0 = now / 2000.0;
         unsafe {
             shader.uniform_buffer_data(&uniform)?;

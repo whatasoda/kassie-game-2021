@@ -1,12 +1,16 @@
 use super::Shader;
+use web_sys::WebGlProgram;
 
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{Document, HtmlImageElement, WebGl2RenderingContext, WebGlTexture};
+use web_sys::{
+    Document, HtmlImageElement, WebGl2RenderingContext, WebGlTexture, WebGlUniformLocation,
+};
 
 pub struct Textures {
+    uniforms: HashMap<u32, WebGlUniformLocation>,
     cache_tex: HashMap<&'static str, WebGlTexture>,
     cache_img: HashMap<&'static str, HtmlImageElement>,
 }
@@ -14,6 +18,7 @@ pub struct Textures {
 impl Textures {
     pub fn empty() -> Self {
         Textures {
+            uniforms: HashMap::new(),
             cache_tex: HashMap::new(),
             cache_img: HashMap::new(),
         }
@@ -61,7 +66,7 @@ impl<V, I, U> Shader<'_, V, I, U> {
     pub fn bind_texture(&self, tex_slot: u32, src: &str) -> Result<(), JsValue> {
         let tex = self.textures.cache_tex.get(src).ok_or("unknown texture")?;
         if tex_slot > 31 {
-            Err("invalid texture slot")?;
+            Err("texture slot out of range")?;
         }
 
         self.ctx
@@ -71,6 +76,47 @@ impl<V, I, U> Shader<'_, V, I, U> {
 
         Ok(())
     }
+
+    pub fn attach_texture(&mut self, tex_id: u32, tex_slot: u32) -> Result<(), JsValue> {
+        self.ensure_program(Some(()))?;
+        if tex_slot > 31 {
+            Err("texture slot out of range")?;
+        }
+
+        let loc = get_tex_uniform_location(
+            self.ctx,
+            self.program.program.as_ref().unwrap(),
+            &mut self.textures.uniforms,
+            tex_id,
+        )?;
+        self.ctx.uniform1ui(Some(loc), tex_slot);
+
+        Ok(())
+    }
+}
+
+const TEX_NAMES: [&'static str; 32] = [
+    "tex0", "tex1", "tex2", "tex3", "tex4", "tex5", "tex6", "tex7", "tex8", "tex9", //
+    "tex10", "tex11", "tex12", "tex13", "tex14", "tex15", "tex16", "tex17", "tex18", "tex19",
+    "tex20", "tex21", "tex22", "tex23", "tex24", "tex25", "tex26", "tex27", "tex28", "tex29",
+    "tex30", "tex31",
+];
+fn get_tex_uniform_location<'a>(
+    ctx: &WebGl2RenderingContext,
+    program: &WebGlProgram,
+    acc: &'a mut HashMap<u32, WebGlUniformLocation>,
+    tex_id: u32,
+) -> Result<&'a WebGlUniformLocation, JsValue> {
+    if !acc.contains_key(&tex_id) {
+        let name = TEX_NAMES
+            .get(tex_id as usize)
+            .ok_or("texture id out of range")?;
+        let loc = ctx
+            .get_uniform_location(program, name)
+            .ok_or(format!("failed to get uniform location tex{}", tex_id))?;
+        acc.insert(tex_id, loc);
+    }
+    Ok(acc.get(&tex_id).unwrap())
 }
 
 async fn load_image(
