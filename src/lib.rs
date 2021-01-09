@@ -1,9 +1,10 @@
+mod log;
 mod scheduler;
 mod shader;
 mod utils;
 
 use crate::scheduler::start_loop;
-use crate::shader::buffer::ConvertArrayView;
+use crate::shader::buffer_data::ConvertArrayView;
 use crate::shader::Shader;
 
 use wasm_bindgen::prelude::*;
@@ -92,7 +93,6 @@ pub async fn start() -> Result<(), JsValue> {
         }
         "#,
     )?;
-    shader.init_buffers()?;
     shader.set_vertex_layout(vec![("position", 3), ("uv", 2)])?;
     shader.set_instance_layout(vec![("model", 16), ("mask", 3)])?;
 
@@ -176,22 +176,4 @@ pub async fn start() -> Result<(), JsValue> {
     })?;
 
     Ok(())
-}
-
-#[wasm_bindgen]
-extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-
-    // The `console.log` is quite polymorphic, so we can bind it with multiple
-    // signatures. Note that we need to use `js_name` to ensure we always call
-    // `log` in JS.
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn log_u32(a: u32);
-
-// // Multiple arguments too!
-// #[wasm_bindgen(js_namespace = console, js_name = log)]
-// fn log_many(a: &str, b: &str);
 }

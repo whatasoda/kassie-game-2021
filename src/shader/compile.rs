@@ -30,11 +30,15 @@ impl<V, I, U> Shader<'_, V, I, U> {
 
     pub fn compile(&mut self, vert: &str, frag: &str) -> Result<(), String> {
         self.ensure_program(None)?;
+
         let vert = compile_shader(self.ctx, WebGl2RenderingContext::VERTEX_SHADER, vert)?;
         let frag = compile_shader(self.ctx, WebGl2RenderingContext::FRAGMENT_SHADER, frag)?;
         let program = link_program(self.ctx, &vert, &frag)?;
+
         setup_uniform_block(self.ctx, &program)?;
+
         self.program.program = Some(program);
+        self.init_buffers()?;
         Ok(())
     }
 }

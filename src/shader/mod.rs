@@ -2,6 +2,7 @@
 mod macros;
 
 pub mod array_buffer;
+pub mod buffer_data;
 mod compile;
 mod texture;
 
