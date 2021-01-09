@@ -1,4 +1,5 @@
 use super::Shader;
+// use crate::log::*;
 use std::collections::HashMap;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
 
@@ -16,7 +17,7 @@ impl Program {
     }
 }
 
-impl<V, I, U> Shader<'_, V, I, U> {
+impl<V, I> Shader<'_, V, I> {
     fn_ensure_option!(
         [pub(super) fn ensure_program],
         program.program,
@@ -34,8 +35,6 @@ impl<V, I, U> Shader<'_, V, I, U> {
         let vert = compile_shader(self.ctx, WebGl2RenderingContext::VERTEX_SHADER, vert)?;
         let frag = compile_shader(self.ctx, WebGl2RenderingContext::FRAGMENT_SHADER, frag)?;
         let program = link_program(self.ctx, &vert, &frag)?;
-
-        setup_uniform_block(self.ctx, &program)?;
 
         self.program.program = Some(program);
         self.init_buffers()?;
@@ -91,13 +90,4 @@ fn link_program(
             .get_program_info_log(&program)
             .unwrap_or_else(|| String::from("Unknown error creating program object")))
     }
-}
-
-fn setup_uniform_block<'a>(
-    ctx: &WebGl2RenderingContext,
-    program: &WebGlProgram,
-) -> Result<(), String> {
-    let index = ctx.get_uniform_block_index(program, "uniforms_");
-    ctx.uniform_block_binding(program, index, 0);
-    Ok(())
 }

@@ -1,4 +1,4 @@
-use super::buffer_data::{buffer_data, ConvertArrayView};
+use super::buffer_data::buffer_data;
 use super::Shader;
 
 use std::cmp::min;
@@ -9,20 +9,18 @@ use web_sys::{WebGl2RenderingContext, WebGlBuffer, WebGlVertexArrayObject};
 
 const DIVISOR: u32 = 1;
 
-pub(super) struct ArrayBuffers<V, I, U>
+pub struct ArrayBuffers<V, I>
 where
     V: Sized,
     I: Sized,
-    U: Sized,
 {
-    _phantom: PhantomData<(V, I, U)>,
+    _phantom: PhantomData<(V, I)>,
     vao: Option<WebGlVertexArrayObject>,
     vertex: Option<WebGlBuffer>,
     instance: Option<WebGlBuffer>,
-    uniform: Option<WebGlBuffer>,
 }
 
-impl<V, I, U> ArrayBuffers<V, I, U>
+impl<V, I> ArrayBuffers<V, I>
 where
     V: Sized,
     I: Sized,
@@ -33,12 +31,11 @@ where
             vao: None,
             vertex: None,
             instance: None,
-            uniform: None,
         }
     }
 }
 
-impl<V, I, U> Shader<'_, V, I, U> {
+impl<V, I> Shader<'_, V, I> {
     fn_ensure_option!(
         [fn ensure_vao],
         buffers.vao,
@@ -57,12 +54,6 @@ impl<V, I, U> Shader<'_, V, I, U> {
         if_none: "instance layout uninitialized",
         if_some: "instance layout already exists",
     );
-    fn_ensure_option!(
-        [fn ensure_uniform],
-        buffers.uniform,
-        if_none: "uniform uninitialized",
-        if_some: "uniform already exists",
-    );
 
     pub(super) fn init_buffers(&mut self) -> Result<(), String> {
         self.ensure_vao(None)?;
@@ -72,18 +63,12 @@ impl<V, I, U> Shader<'_, V, I, U> {
                 .create_vertex_array()
                 .ok_or("failed to create vao")?,
         );
-        self.buffers.uniform = Some(create_uniform_buffer(self.ctx)?);
         Ok(())
     }
 
-    pub fn prepare_draw(&self) -> Result<(), String> {
+    pub fn prepare_array_buffers(&self) -> Result<(), String> {
         self.ensure_vao(Some(()))?;
 
-        self.ctx.bind_buffer_base(
-            WebGl2RenderingContext::UNIFORM_BUFFER,
-            0,
-            self.buffers.uniform.as_ref(),
-        );
         self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
         Ok(())
     }
@@ -117,20 +102,6 @@ impl<V, I, U> Shader<'_, V, I, U> {
             true,
         );
         self.ctx.bind_vertex_array(None);
-        Ok(())
-    }
-
-    pub unsafe fn uniform_buffer_data(&self, data: &U) -> Result<(), String>
-    where
-        U: ConvertArrayView,
-    {
-        buffer_data(
-            &self.ctx,
-            WebGl2RenderingContext::DYNAMIC_DRAW,
-            self.buffers.uniform.as_ref(),
-            data,
-            true,
-        );
         Ok(())
     }
 
@@ -211,11 +182,5 @@ where
     if byte_offset != byte_length {
         return Err(String::from("invalid byte length"));
     }
-    Ok(buffer)
-}
-
-fn create_uniform_buffer(ctx: &WebGl2RenderingContext) -> Result<WebGlBuffer, String> {
-    let buffer = ctx.create_buffer().ok_or("failed to create buffer")?;
-    ctx.bind_buffer(WebGl2RenderingContext::UNIFORM_BUFFER, Some(&buffer));
     Ok(buffer)
 }

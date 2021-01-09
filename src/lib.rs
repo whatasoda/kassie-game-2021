@@ -56,7 +56,7 @@ pub async fn start() -> Result<(), JsValue> {
         CTX.as_ref().unwrap()
     };
 
-    let mut shader = Shader::<Vertex, Instance, Uniform>::new(ctx);
+    let mut shader = Shader::<Vertex, Instance>::new(ctx);
     shader.compile(
         r#"#version 300 es
         layout (location = 0) in vec3 position;
@@ -93,6 +93,7 @@ pub async fn start() -> Result<(), JsValue> {
         }
         "#,
     )?;
+    shader.bind_uniform_blocks(vec!["uniforms_"])?;
     shader.set_vertex_layout(vec![("position", 3), ("uv", 2)])?;
     shader.set_instance_layout(vec![("model", 16), ("mask", 3)])?;
 
@@ -161,9 +162,10 @@ pub async fn start() -> Result<(), JsValue> {
         shader.attach_texture(0, 0)?;
         uniform.size0 = now / 2000.0;
         unsafe {
-            shader.uniform_buffer_data(&uniform)?;
+            shader.uniform_buffer_data("uniforms_", &uniform)?;
         }
-        shader.prepare_draw()?;
+        shader.prepare_array_buffers()?;
+        shader.preapre_uniform_blocks()?;
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
         ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
         ctx.draw_arrays_instanced(

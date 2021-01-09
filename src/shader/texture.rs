@@ -25,7 +25,7 @@ impl Textures {
     }
 }
 
-impl<V, I, U> Shader<'_, V, I, U> {
+impl<V, I> Shader<'_, V, I> {
     pub async fn create_texture<'a>(
         &'a mut self,
         document: &'a Document,
@@ -89,7 +89,7 @@ impl<V, I, U> Shader<'_, V, I, U> {
             &mut self.textures.uniforms,
             tex_id,
         )?;
-        self.ctx.uniform1ui(Some(loc), tex_slot);
+        self.ctx.uniform1i(Some(loc), tex_slot as i32);
 
         Ok(())
     }
