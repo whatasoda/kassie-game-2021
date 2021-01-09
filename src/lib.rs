@@ -9,7 +9,7 @@ use crate::shader::Shader;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::WebGl2RenderingContext;
-use webgl_matrix::Vec3;
+use webgl_matrix::{Mat4, Matrix, Vec3};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -21,6 +21,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 struct Vertex {
     position: Vec3,
     uv: [f32; 2],
+}
+
+#[repr(C)]
+struct Instance {
+    model: Mat4,
+    mask: Vec3,
 }
 
 #[repr(C)]
@@ -39,102 +45,132 @@ pub async fn start() -> Result<(), JsValue> {
     let canvas = document.get_element_by_id("canvas").unwrap();
     let canvas: web_sys::HtmlCanvasElement = canvas.dyn_into::<web_sys::HtmlCanvasElement>()?;
 
-    unsafe {
+    let ctx: &'static WebGl2RenderingContext = unsafe {
         CTX = Some(
             canvas
                 .get_context("webgl2")?
                 .unwrap()
                 .dyn_into::<WebGl2RenderingContext>()?,
         );
-    }
+        CTX.as_ref().unwrap()
+    };
 
-    let ctx: &'static WebGl2RenderingContext = unsafe { CTX.as_ref().unwrap() };
-
-    let mut shader = Shader::<Vertex, (), Uniform>::new(ctx);
+    let mut shader = Shader::<Vertex, Instance, Uniform>::new(ctx);
     shader.compile(
-        vec!["position", "uv"],
         r#"#version 300 es
         layout (location = 0) in vec3 position;
         layout (location = 1) in vec2 uv;
+        layout (location = 2) in mat4 model;
+        layout (location = 6) in vec3 mask;
 
         out vec2 v_uv;
+        out vec3 v_mask;
 
         void main() {
-            gl_Position = vec4(position, 1.0);
+            gl_Position = model * vec4(position, 1.0);
             v_uv = uv;
+            v_mask = mask;
         }
         "#,
         r#"#version 300 es
         precision highp float;
+        uniform sampler2D tex0;
         layout (std140) uniform uniforms_ {
             float size0;
             float size1;
         };
-        uniform sampler2D tex0;
 
         in vec2 v_uv;
+        in vec3 v_mask;
 
         out vec4 outColor;
 
         void main() {
             vec4 tex_color = texture(tex0, v_uv);
-            vec3 rainbow = min((1.0 - tex_color.a) * vec3(gl_FragCoord.xy / size0 / size1, 0.0), vec3(1.0));
-            outColor = vec4((tex_color.xyz * tex_color.a) + rainbow, 1.0);
+            vec3 rainbow = min((1.0 - tex_color.a) * vec3(v_uv / size0 / size1, 0.0), vec3(1.0));
+            outColor = vec4(((tex_color.xyz * tex_color.a) + rainbow) * v_mask, 1.0);
         }
         "#,
     )?;
     shader.init_buffers()?;
     shader.set_vertex_layout(vec![("position", 3), ("uv", 2)])?;
+    shader.set_instance_layout(vec![("model", 16), ("mask", 3)])?;
 
     let vertices = vec![
         Vertex {
-            position: [-0.7, -0.7, 0.5],
+            position: [-0.4, -0.4, 0.5],
             uv: [0.0, 1.0],
         },
         Vertex {
-            position: [0.7, -0.7, 0.5],
+            position: [0.4, -0.4, 0.5],
             uv: [1.0, 1.0],
         },
         Vertex {
-            position: [-0.7, 0.7, 0.5],
+            position: [-0.4, 0.4, 0.5],
             uv: [0.0, 0.0],
         },
         Vertex {
-            position: [-0.7, 0.7, 0.5],
+            position: [-0.4, 0.4, 0.5],
             uv: [0.0, 0.0],
         },
         Vertex {
-            position: [0.7, -0.7, 0.5],
+            position: [0.4, -0.4, 0.5],
             uv: [1.0, 1.0],
         },
         Vertex {
-            position: [0.7, 0.7, 0.5],
+            position: [0.4, 0.4, 0.5],
             uv: [1.0, 0.0],
         },
     ];
+    let instances = vec![
+        Instance {
+            model: *Mat4::identity().translate(&[-0.4, -0.4, 0.1]),
+            mask: [1.0, 0.0, 0.0],
+        },
+        Instance {
+            model: *Mat4::identity().translate(&[0.4, 0.4, 0.1]),
+            mask: [0.0, 1.0, 0.0],
+        },
+        Instance {
+            model: *Mat4::identity().translate(&[-0.4, 0.4, 0.1]),
+            mask: [0.0, 0.0, 1.0],
+        },
+        Instance {
+            model: *Mat4::identity().translate(&[0.4, -0.4, 0.1]),
+            mask: [1.0, 1.0, 1.0],
+        },
+    ];
     let mut uniform = Uniform {
-        size0: 200.0,
+        size0: 0.01,
         size1: 0.5,
         _pad0: [0, 0],
     };
+    shader.activate();
 
-    ctx.use_program(shader.program.program.as_ref());
     shader
         .create_texture(&document, "sample_texture.png")
         .await?;
+    unsafe {
+        shader.vertex_buffer_data(&vertices)?;
+        shader.instance_buffer_data(&instances)?;
+    }
 
     start_loop(move |now| {
-        ctx.use_program(shader.program.program.as_ref());
+        shader.activate();
         shader.bind_texture(0, "sample_texture.png")?;
-        uniform.size0 = now / 20.0;
+        uniform.size0 = now / 2000.0;
         unsafe {
-            shader.vertex_buffer_data(&vertices)?;
             shader.uniform_buffer_data(&uniform)?;
         }
+        shader.prepare_draw()?;
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
         ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
-        shader.prepare_draw()?;
-        ctx.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, vertices.len() as i32);
+        ctx.draw_arrays_instanced(
+            WebGl2RenderingContext::TRIANGLES,
+            0,
+            vertices.len() as i32,
+            instances.len() as i32,
+        );
         Ok(())
     })?;
 

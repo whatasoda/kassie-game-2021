@@ -1,6 +1,8 @@
+#[macro_use]
+mod macros;
+
 pub mod buffer;
 mod compile;
-// pub mod ext;
 mod texture;
 
 use web_sys::WebGl2RenderingContext;
