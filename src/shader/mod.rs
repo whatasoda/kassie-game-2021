@@ -9,24 +9,20 @@ mod uniform_buffer;
 
 use web_sys::WebGl2RenderingContext;
 
-pub struct Shader<'ctx, V, I>
-where
-    V: Sized,
-    I: Sized,
-{
-    ctx: &'ctx WebGl2RenderingContext,
+pub struct Shader {
+    ctx: &'static WebGl2RenderingContext,
     program: compile::Program,
-    buffers: array_buffer::ArrayBuffers<V, I>,
+    arrays: array_buffer::ArrayBuffers,
     uniforms: uniform_buffer::UniformBlocks,
     textures: texture::Textures,
 }
 
-impl<'ctx, V, I> Shader<'ctx, V, I> {
-    pub fn new(ctx: &'ctx WebGl2RenderingContext) -> Self {
+impl Shader {
+    pub fn new(ctx: &'static WebGl2RenderingContext) -> Self {
         Shader {
             ctx,
             program: compile::Program::empty(),
-            buffers: array_buffer::ArrayBuffers::empty(),
+            arrays: array_buffer::ArrayBuffers::empty(),
             uniforms: uniform_buffer::UniformBlocks::empty(),
             textures: texture::Textures::empty(),
         }

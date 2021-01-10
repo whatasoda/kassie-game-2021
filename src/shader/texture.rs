@@ -25,7 +25,7 @@ impl Textures {
     }
 }
 
-impl<V, I> Shader<'_, V, I> {
+impl Shader {
     pub async fn create_texture<'a>(
         &'a mut self,
         document: &'a Document,

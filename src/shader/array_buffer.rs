@@ -2,63 +2,43 @@ use super::buffer_data::buffer_data;
 use super::Shader;
 
 use std::cmp::min;
-use std::marker::PhantomData;
+use std::collections::HashMap;
 use std::mem;
 use web_sys::WebGlProgram;
 use web_sys::{WebGl2RenderingContext, WebGlBuffer, WebGlVertexArrayObject};
 
-const DIVISOR: u32 = 1;
-
-pub struct ArrayBuffers<V, I>
-where
-    V: Sized,
-    I: Sized,
-{
-    _phantom: PhantomData<(V, I)>,
+pub struct ArrayBuffers {
     vao: Option<WebGlVertexArrayObject>,
-    vertex: Option<WebGlBuffer>,
-    instance: Option<WebGlBuffer>,
+    buffers: HashMap<&'static str, WebGlBuffer>,
 }
 
-impl<V, I> ArrayBuffers<V, I>
-where
-    V: Sized,
-    I: Sized,
-{
+impl ArrayBuffers {
     pub fn empty() -> Self {
         ArrayBuffers {
-            _phantom: PhantomData {},
             vao: None,
-            vertex: None,
-            instance: None,
+            buffers: HashMap::new(),
         }
     }
 }
 
-impl<V, I> Shader<'_, V, I> {
+impl Shader {
     fn_ensure_option!(
         [fn ensure_vao],
-        buffers.vao,
+        arrays.vao,
         if_none: "VAO uninitialized",
         if_some: "VAO already exists",
     );
-    fn_ensure_option!(
-        [fn ensure_vertex],
-        buffers.vertex,
-        if_none: "vertex layout uninitialized",
-        if_some: "vertex layout already exists",
-    );
-    fn_ensure_option!(
-        [fn ensure_instance],
-        buffers.instance,
-        if_none: "instance layout uninitialized",
-        if_some: "instance layout already exists",
+    fn_ensure_hashmap!(
+        [fn ensure_array_buffer],
+        arrays.buffers,
+        if_none: "array buffer uninitialized",
+        if_some: "array buffer already exists",
     );
 
     pub(super) fn init_buffers(&mut self) -> Result<(), String> {
         self.ensure_vao(None)?;
 
-        self.buffers.vao = Some(
+        self.arrays.vao = Some(
             self.ctx
                 .create_vertex_array()
                 .ok_or("failed to create vao")?,
@@ -69,70 +49,71 @@ impl<V, I> Shader<'_, V, I> {
     pub fn prepare_array_buffers(&self) -> Result<(), String> {
         self.ensure_vao(Some(()))?;
 
-        self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
+        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         Ok(())
     }
 
-    pub unsafe fn vertex_buffer_data(&self, data: &Vec<V>) -> Result<(), String> {
+    pub fn layout_buffer<T>(
+        &mut self,
+        name: &'static str,
+        divisor: u32,
+        layout: Vec<(&'static str, i32)>,
+    ) -> Result<(), String>
+    where
+        T: Sized,
+    {
         self.ensure_vao(Some(()))?;
-        self.ensure_vertex(Some(()))?;
-
-        self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
-        buffer_data(
-            &self.ctx,
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            self.buffers.vertex.as_ref(),
-            data,
-            false,
-        );
-        self.ctx.bind_vertex_array(None);
-        Ok(())
-    }
-
-    pub unsafe fn instance_buffer_data(&self, data: &Vec<I>) -> Result<(), String> {
-        self.ensure_vao(Some(()))?;
-        self.ensure_instance(Some(()))?;
-
-        self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
-        buffer_data(
-            &self.ctx,
-            WebGl2RenderingContext::ARRAY_BUFFER,
-            self.buffers.instance.as_ref(),
-            data,
-            true,
-        );
-        self.ctx.bind_vertex_array(None);
-        Ok(())
-    }
-
-    pub fn set_vertex_layout(&mut self, layout: Vec<(&'static str, i32)>) -> Result<(), String> {
-        self.ensure_vao(Some(()))?;
-        self.ensure_vertex(None)?;
         self.ensure_program(Some(()))?;
+        self.ensure_array_buffer(name, None)?;
 
-        self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
-        self.buffers.vertex = Some(create_buffer_with_layout::<V>(
+        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
+        let buffer = create_buffer_with_layout::<T>(
             self.ctx,
             &self.program.program.as_ref().unwrap(),
+            divisor,
             layout,
-            false,
-        )?);
+        )?;
         self.ctx.bind_vertex_array(None);
+        self.arrays.buffers.insert(name, buffer);
         Ok(())
     }
 
-    pub fn set_instance_layout(&mut self, layout: Vec<(&'static str, i32)>) -> Result<(), String> {
-        self.ensure_vao(Some(()))?;
-        self.ensure_instance(None)?;
-        self.ensure_program(Some(()))?;
+    pub unsafe fn buffer_data_static<T>(
+        &self,
+        name: &'static str,
+        data: &Vec<T>,
+    ) -> Result<(), String> {
+        self.buffer_data(name, data, false)
+    }
+    pub unsafe fn buffer_data_dynamic<T>(
+        &self,
+        name: &'static str,
+        data: &Vec<T>,
+    ) -> Result<(), String> {
+        self.buffer_data(name, data, true)
+    }
 
-        self.ctx.bind_vertex_array(self.buffers.vao.as_ref());
-        self.buffers.instance = Some(create_buffer_with_layout::<I>(
+    unsafe fn buffer_data<T>(
+        &self,
+        name: &'static str,
+        data: &Vec<T>,
+        is_dynamic: bool,
+    ) -> Result<(), String>
+    where
+        T: Sized,
+    {
+        self.ensure_vao(Some(()))?;
+        self.ensure_array_buffer(name, Some(()))?;
+
+        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
+        let buffer = self.arrays.buffers.get(name).unwrap();
+        buffer_data(
             self.ctx,
-            &self.program.program.as_ref().unwrap(),
-            layout,
-            true,
-        )?);
+            WebGl2RenderingContext::ARRAY_BUFFER,
+            Some(buffer),
+            data,
+            is_dynamic,
+        );
         self.ctx.bind_vertex_array(None);
         Ok(())
     }
@@ -141,8 +122,8 @@ impl<V, I> Shader<'_, V, I> {
 fn create_buffer_with_layout<T>(
     ctx: &WebGl2RenderingContext,
     program: &WebGlProgram,
+    divisor: u32,
     layout: Vec<(&str, i32)>,
-    is_instanced: bool,
 ) -> Result<WebGlBuffer, String>
 where
     T: Sized,
@@ -172,8 +153,8 @@ where
                 byte_length,
                 byte_offset,
             );
-            if is_instanced {
-                ctx.vertex_attrib_divisor(loc, DIVISOR);
+            if divisor != 0 {
+                ctx.vertex_attrib_divisor(loc, divisor);
             }
             byte_offset += stride * 4;
             loc_offset += 1;

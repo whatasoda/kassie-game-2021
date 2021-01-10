@@ -56,7 +56,7 @@ pub async fn start() -> Result<(), JsValue> {
         CTX.as_ref().unwrap()
     };
 
-    let mut shader = Shader::<Vertex, Instance>::new(ctx);
+    let mut shader = Shader::new(ctx);
     shader.compile(
         r#"#version 300 es
         layout (location = 0) in vec3 position;
@@ -94,8 +94,8 @@ pub async fn start() -> Result<(), JsValue> {
         "#,
     )?;
     shader.bind_uniform_blocks(vec!["uniforms_"])?;
-    shader.set_vertex_layout(vec![("position", 3), ("uv", 2)])?;
-    shader.set_instance_layout(vec![("model", 16), ("mask", 3)])?;
+    shader.layout_buffer::<Vertex>("vertex", 0, vec![("position", 3), ("uv", 2)])?;
+    shader.layout_buffer::<Instance>("instance", 1, vec![("model", 16), ("mask", 3)])?;
 
     let vertices = vec![
         Vertex {
@@ -152,8 +152,8 @@ pub async fn start() -> Result<(), JsValue> {
         .create_texture(&document, "sample_texture.png")
         .await?;
     unsafe {
-        shader.vertex_buffer_data(&vertices)?;
-        shader.instance_buffer_data(&instances)?;
+        shader.buffer_data_static("vertex", &vertices)?;
+        shader.buffer_data_dynamic("instance", &instances)?;
     }
 
     start_loop(move |now| {

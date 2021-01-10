@@ -17,7 +17,7 @@ impl Program {
     }
 }
 
-impl<V, I> Shader<'_, V, I> {
+impl Shader {
     fn_ensure_option!(
         [pub(super) fn ensure_program],
         program.program,

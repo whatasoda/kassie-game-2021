@@ -9,6 +9,7 @@ use web_sys::{WebGl2RenderingContext, WebGlBuffer};
 static mut UNIFORM_BUFFERS: Option<HashMap<&'static str, WebGlBuffer>> = None;
 
 pub struct UniformBlocks {
+    is_ready: bool,
     bindings: HashMap<&'static str, u32>,
     buffers: &'static mut HashMap<&'static str, WebGlBuffer>,
 }
@@ -22,25 +23,26 @@ impl UniformBlocks {
             UNIFORM_BUFFERS.as_mut().unwrap()
         };
         Self {
+            is_ready: false,
             bindings: HashMap::new(),
             buffers,
         }
     }
 }
 
-impl<V, I> Shader<'_, V, I> {
-    fn get_uniform_buffer_by_name(&self, name: &'static str) -> Result<&WebGlBuffer, JsValue> {
-        Ok(self
-            .uniforms
-            .buffers
-            .get(name)
-            .ok_or("uniform buffer not found")?)
-    }
+impl Shader {
+    fn_ensure_hashmap!(
+        [fn ensure_uniform_buffer],
+        uniforms.buffers,
+        if_none: "uniform buffer uninitialized",
+        if_some: "uniform buffer already exists",
+    );
 
     pub fn preapre_uniform_blocks(&self) -> Result<(), JsValue> {
         let mut bindings = self.uniforms.bindings.iter();
         while let Some((name, binding)) = bindings.next() {
-            let buffer = self.get_uniform_buffer_by_name(name)?;
+            self.ensure_uniform_buffer(name, Some(()))?;
+            let buffer = self.uniforms.buffers.get(name).unwrap();
             self.ctx.bind_buffer_base(
                 WebGl2RenderingContext::UNIFORM_BUFFER,
                 *binding,
@@ -51,10 +53,15 @@ impl<V, I> Shader<'_, V, I> {
     }
 
     pub fn bind_uniform_blocks(&mut self, blocks: Vec<&'static str>) -> Result<(), String> {
-        // TODO: avoid being called over twice
+        if self.uniforms.is_ready {
+            return Err(String::from("cannot bind uniform blocks over twice"));
+        }
+
         let mut blocks = blocks.into_iter();
         let mut curr_binding = 0;
         while let Some(name) = blocks.next() {
+            self.ensure_uniform_buffer(name, None)?;
+
             let program = self.program.program.as_ref().unwrap();
             let index = self.ctx.get_uniform_block_index(program, name);
             if index == 0xffffffff {
@@ -77,7 +84,8 @@ impl<V, I> Shader<'_, V, I> {
     where
         T: ConvertArrayView,
     {
-        let buffer = self.get_uniform_buffer_by_name(name)?;
+        self.ensure_uniform_buffer(name, Some(()))?;
+        let buffer = self.uniforms.buffers.get(name).unwrap();
         buffer_data(
             &self.ctx,
             WebGl2RenderingContext::UNIFORM_BUFFER,
