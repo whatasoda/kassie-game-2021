@@ -57,10 +57,7 @@ where
     }
 }
 
-impl<T> ConvertArrayView for Vec<T>
-where
-    T: Sized,
-{
+impl<T> ConvertArrayView for Vec<T> {
     fn byte_offset(&self) -> usize {
         self.as_ptr() as usize
     }

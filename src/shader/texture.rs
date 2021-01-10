@@ -26,18 +26,14 @@ impl Textures {
 }
 
 impl Shader {
-    pub async fn create_texture<'a>(
-        &'a mut self,
-        document: &'a Document,
-        src: &'static str,
-    ) -> Result<(), JsValue> {
+    pub async fn create_texture<'a>(&'a mut self, src: &'static str) -> Result<(), JsValue> {
         if self.textures.cache_tex.contains_key(src) {
             return Ok(());
         }
         if !self.textures.cache_img.contains_key(src) {
             self.textures
                 .cache_img
-                .insert(src, load_image(&document, src).await?);
+                .insert(src, load_image(self.doc, src).await?);
         }
         let img = self.textures.cache_img.get(src);
         let img = img.as_ref().unwrap();

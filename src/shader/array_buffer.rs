@@ -1,4 +1,4 @@
-use super::buffer_data::buffer_data;
+use super::buffer_data::{buffer_data, ConvertArrayView};
 use super::Shader;
 
 use std::cmp::min;
@@ -78,29 +78,28 @@ impl Shader {
         Ok(())
     }
 
-    pub unsafe fn buffer_data_static<T>(
-        &self,
-        name: &'static str,
-        data: &Vec<T>,
-    ) -> Result<(), String> {
+    pub unsafe fn buffer_data_static<T>(&self, name: &'static str, data: &T) -> Result<(), String>
+    where
+        T: ConvertArrayView,
+    {
         self.buffer_data(name, data, false)
     }
-    pub unsafe fn buffer_data_dynamic<T>(
-        &self,
-        name: &'static str,
-        data: &Vec<T>,
-    ) -> Result<(), String> {
+
+    pub unsafe fn buffer_data_dynamic<T>(&self, name: &'static str, data: &T) -> Result<(), String>
+    where
+        T: ConvertArrayView,
+    {
         self.buffer_data(name, data, true)
     }
 
     unsafe fn buffer_data<T>(
         &self,
         name: &'static str,
-        data: &Vec<T>,
+        data: &T,
         is_dynamic: bool,
     ) -> Result<(), String>
     where
-        T: Sized,
+        T: ConvertArrayView,
     {
         self.ensure_vao(Some(()))?;
         self.ensure_array_buffer(name, Some(()))?;

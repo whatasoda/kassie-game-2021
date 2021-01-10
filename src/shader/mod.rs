@@ -7,10 +7,11 @@ mod compile;
 mod texture;
 mod uniform_buffer;
 
-use web_sys::WebGl2RenderingContext;
+use web_sys::{Document, WebGl2RenderingContext};
 
 pub struct Shader {
-    ctx: &'static WebGl2RenderingContext,
+    doc: &'static Document,
+    pub ctx: &'static WebGl2RenderingContext,
     program: compile::Program,
     arrays: array_buffer::ArrayBuffers,
     uniforms: uniform_buffer::UniformBlocks,
@@ -18,8 +19,9 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn new(ctx: &'static WebGl2RenderingContext) -> Self {
+    pub fn new(doc: &'static Document, ctx: &'static WebGl2RenderingContext) -> Self {
         Shader {
+            doc,
             ctx,
             program: compile::Program::empty(),
             arrays: array_buffer::ArrayBuffers::empty(),
