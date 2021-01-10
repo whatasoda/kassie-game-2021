@@ -60,8 +60,6 @@ impl Shader {
         let mut blocks = blocks.into_iter();
         let mut curr_binding = 0;
         while let Some(name) = blocks.next() {
-            self.ensure_uniform_buffer(name, None)?;
-
             let program = self.program.program.as_ref().unwrap();
             let index = self.ctx.get_uniform_block_index(program, name);
             if index == 0xffffffff {

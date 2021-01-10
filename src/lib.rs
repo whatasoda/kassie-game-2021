@@ -1,3 +1,5 @@
+mod camera;
+mod impls;
 mod log;
 mod scheduler;
 mod shader;
@@ -8,6 +10,7 @@ use crate::scheduler::start_loop;
 use crate::shader::buffer_data::ConvertArrayView;
 use crate::shader::Shader;
 
+use std::f32::consts::PI;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Document, WebGl2RenderingContext};
@@ -50,6 +53,7 @@ fn init_static() -> Result<(&'static Document, &'static WebGl2RenderingContext),
 #[wasm_bindgen]
 pub async fn start() -> Result<(), JsValue> {
     let (doc, ctx) = init_static()?;
+    let mut camera = camera::CameraController::default();
 
     let mut uniform = Uniform {
         size0: 0.01,
@@ -60,9 +64,23 @@ pub async fn start() -> Result<(), JsValue> {
     let mut test_shader = shaders::test::TestShader::new(Shader::new(doc, ctx))?;
     test_shader.init().await?;
 
+    let mut entity_shader = shaders::entity_shader::EntityShader::new(Shader::new(doc, ctx))?;
+    entity_shader.init().await?;
+
+    camera.view.position = [0., 0., 10.];
+    ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
+    ctx.depth_func(WebGl2RenderingContext::LEQUAL);
+    ctx.enable(WebGl2RenderingContext::BLEND);
+    ctx.blend_func(
+        WebGl2RenderingContext::SRC_ALPHA,
+        WebGl2RenderingContext::ONE_MINUS_SRC_ALPHA,
+    );
     start_loop(move |now| {
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
-        ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+        ctx.clear_depth(1.0);
+        ctx.clear(
+            WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT,
+        );
 
         uniform.size0 = now / 2000.0;
         unsafe {
@@ -71,6 +89,16 @@ pub async fn start() -> Result<(), JsValue> {
                 .uniform_buffer_data("uniforms_", &uniform)?;
         }
         test_shader.draw(now)?;
+
+        let t = ((now % 5000.0) / 5000.0) * 2. * PI;
+        camera.view.direction = [t.cos(), 0., t.sin()];
+        camera.refresh();
+        unsafe {
+            entity_shader
+                .shader
+                .uniform_buffer_data("camera", &camera.camera)?;
+        }
+        entity_shader.draw(now)?;
         Ok(())
     })?;
 

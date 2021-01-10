@@ -5,9 +5,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-    Document, HtmlImageElement, WebGl2RenderingContext, WebGlTexture, WebGlUniformLocation,
-};
+use web_sys::{HtmlImageElement, WebGl2RenderingContext, WebGlTexture, WebGlUniformLocation};
 
 pub struct Textures {
     uniforms: HashMap<u32, WebGlUniformLocation>,
