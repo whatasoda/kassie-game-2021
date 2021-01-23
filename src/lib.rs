@@ -12,8 +12,7 @@ use crate::entities::get_current_instance_value;
 use crate::entities::sample_batter::SampleEntity;
 use crate::input::{set_input_handler, InputReceiver};
 use crate::scheduler::start_loop;
-use crate::shader::buffer_data::ConvertArrayView;
-use crate::shader::Shader;
+use crate::shader::{ConvertArrayView, Shader, ShaderWrapper};
 use crate::shaders::entity_shader::EntityShader;
 use crate::shaders::test::TestShader;
 
@@ -93,8 +92,8 @@ pub async fn start() -> Result<(), JsValue> {
     let mut test_shader = TestShader::new(Shader::new(doc.clone(), ctx.clone()))?;
     test_shader.init().await?;
 
-    let mut entity_shader = EntityShader::new(Shader::new(doc.clone(), ctx.clone()))?;
-    entity_shader.init().await?;
+    let entity_shader = ShaderWrapper::new(doc.clone(), ctx.clone(), EntityShader {})?;
+    entity_shader.borrow_mut().init_textures().await?;
 
     camera.view.position = [0., 0., 10.];
     ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
@@ -124,14 +123,18 @@ pub async fn start() -> Result<(), JsValue> {
         // camera.view.direction = [t.cos(), 0., t.sin()];
         camera.view.direction = [0., 0., -1.];
         camera.refresh();
-        entity_shader.instances.as_mut().unwrap()[0] =
-            get_current_instance_value(test.as_ref().borrow(), now);
+
+        let mut shader = entity_shader.borrow_mut();
+        shader.clear();
+        shader
+            .instances
+            .push(get_current_instance_value(test.borrow(), now));
         unsafe {
-            entity_shader
-                .shader
+            shader
+                .controller
                 .uniform_buffer_data("camera", &camera.camera)?;
         }
-        entity_shader.draw(now)?;
+        shader.draw(now)?;
         Ok(())
     })?;
 

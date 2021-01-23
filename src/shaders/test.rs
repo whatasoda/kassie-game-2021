@@ -1,4 +1,4 @@
-use crate::shader::buffer_data::ConvertArrayView;
+use crate::shader::ConvertArrayView;
 use crate::shader::Shader;
 
 use wasm_bindgen::JsValue;
@@ -10,7 +10,6 @@ struct Vertex {
     position: Vec3,
     uv: [f32; 2],
 }
-impl ConvertArrayView for Vertex {}
 
 #[repr(C)]
 struct Instance {
