@@ -32,9 +32,17 @@ impl Shader {
     pub fn compile(&mut self, vert: &str, frag: &str) -> Result<(), String> {
         self.ensure_program(None)?;
 
-        let vert = compile_shader(self.ctx, WebGl2RenderingContext::VERTEX_SHADER, vert)?;
-        let frag = compile_shader(self.ctx, WebGl2RenderingContext::FRAGMENT_SHADER, frag)?;
-        let program = link_program(self.ctx, &vert, &frag)?;
+        let vert = compile_shader(
+            self.ctx.as_ref(),
+            WebGl2RenderingContext::VERTEX_SHADER,
+            vert,
+        )?;
+        let frag = compile_shader(
+            self.ctx.as_ref(),
+            WebGl2RenderingContext::FRAGMENT_SHADER,
+            frag,
+        )?;
+        let program = link_program(self.ctx.as_ref(), &vert, &frag)?;
 
         self.program.program = Some(program);
         self.init_buffers()?;

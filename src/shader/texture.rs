@@ -31,7 +31,7 @@ impl Shader {
         if !self.textures.cache_img.contains_key(src) {
             self.textures
                 .cache_img
-                .insert(src, load_image(self.doc, src).await?);
+                .insert(src, load_image(self.doc.as_ref(), src).await?);
         }
         let img = self.textures.cache_img.get(src);
         let img = img.as_ref().unwrap();
@@ -78,7 +78,7 @@ impl Shader {
         }
 
         let loc = get_tex_uniform_location(
-            self.ctx,
+            self.ctx.as_ref(),
             self.program.program.as_ref().unwrap(),
             &mut self.textures.uniforms,
             tex_id,

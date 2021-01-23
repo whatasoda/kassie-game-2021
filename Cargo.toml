@@ -37,6 +37,7 @@ features = [
   'Element',
   'HtmlCanvasElement',
   'HtmlImageElement',
+  'MouseEvent',
   'Performance',
   'WebGl2RenderingContext',
   'WebGlBuffer',

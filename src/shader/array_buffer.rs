@@ -68,7 +68,7 @@ impl Shader {
 
         self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         let buffer = create_buffer_with_layout::<T>(
-            self.ctx,
+            self.ctx.as_ref(),
             &self.program.program.as_ref().unwrap(),
             divisor,
             layout,
@@ -107,7 +107,7 @@ impl Shader {
         self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         let buffer = self.arrays.buffers.get(name).unwrap();
         buffer_data(
-            self.ctx,
+            self.ctx.as_ref(),
             WebGl2RenderingContext::ARRAY_BUFFER,
             Some(buffer),
             data,

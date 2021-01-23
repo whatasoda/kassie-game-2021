@@ -7,4 +7,7 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     pub fn log_u32(a: u32);
+
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    pub fn log_f32(a: f32);
 }

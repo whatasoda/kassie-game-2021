@@ -12,23 +12,25 @@ struct Vertex {
 }
 
 #[repr(C)]
-struct Instance {
-    model: Mat4,
+pub struct Instance {
+    pub model: Mat4,
+    pub uv_offset: [f32; 2],
+    pub uv_scale: [f32; 2],
 }
 
 pub struct EntityShader {
     pub shader: Shader,
-    instances: Option<Vec<Instance>>,
+    pub instances: Option<Vec<Instance>>,
 }
 
 impl ConvertArrayView for [Vertex; 6] {}
 static VERTICES: [Vertex; 6] = [
     Vertex {
-        position: [-1., 0.],
+        position: [-1., -1.],
         uv: [0.0, 1.0],
     },
     Vertex {
-        position: [1., 0.],
+        position: [1., -1.],
         uv: [1.0, 1.0],
     },
     Vertex {
@@ -40,7 +42,7 @@ static VERTICES: [Vertex; 6] = [
         uv: [0.0, 0.0],
     },
     Vertex {
-        position: [1., 0.],
+        position: [1., -1.],
         uv: [1.0, 1.0],
     },
     Vertex {
@@ -53,7 +55,10 @@ impl EntityShader {
     const VERT: &'static str = r#"#version 300 es
 layout (location = 0) in vec2 position;
 layout (location = 1) in vec2 uv;
+
 layout (location = 2) in mat4 model;
+layout (location = 6) in vec2 uv_offset;
+layout (location = 7) in vec2 uv_scale;
 
 out vec2 v_uv;
 
@@ -62,17 +67,14 @@ layout (std140) uniform camera {
 };
 
 void main() {
-    v_uv = uv;
-    gl_Position = vpMatrix * (model * vec4(position, 0.0, 1.0));
+    v_uv = uv_scale * uv + uv_offset;
+    mat4 mvp = vpMatrix * model;
+    gl_Position = mvp * vec4(position, 0.0, 1.0);
 }
 "#;
     const FRAG: &'static str = r#"#version 300 es
 precision highp float;
 uniform sampler2D tex0;
-layout (std140) uniform uniforms_ {
-    float size0;
-    float size1;
-};
 
 in vec2 v_uv;
 
@@ -80,16 +82,20 @@ out vec4 outColor;
 
 void main() {
     vec4 tex_color = texture(tex0, v_uv);
-    outColor = tex_color.rgba;
+    outColor = tex_color;
 }
 "#;
 
     pub fn new(mut shader: Shader) -> Result<Self, JsValue> {
         VERTICES.as_ptr();
         shader.compile(Self::VERT, Self::FRAG)?;
-        shader.bind_uniform_blocks(vec!["uniforms_", "camera"])?;
+        shader.bind_uniform_blocks(vec!["camera"])?;
         shader.layout_buffer::<Vertex>("vertex", 0, vec![("position", 2), ("uv", 2)])?;
-        shader.layout_buffer::<Instance>("instance", 1, vec![("model", 16)])?;
+        shader.layout_buffer::<Instance>(
+            "instance",
+            1,
+            vec![("model", 16), ("uv_offset", 2), ("uv_scale", 2)],
+        )?;
         unsafe {
             shader.buffer_data_static("vertex", &VERTICES)?;
         }
@@ -104,32 +110,40 @@ void main() {
         let shader = &mut self.shader;
         self.instances = Some(vec![
             Instance {
-                model: *Mat4::identity().translate(&[0., 0., -100.3]).scale(10.),
+                model: *Mat4::identity().translate(&[0., 0., -10.3]).scale(10.),
+                uv_offset: [0., 0.],
+                uv_scale: [1., 1.],
             },
-            Instance {
-                model: *Mat4::identity().translate(&[0., -10., 0.]),
-            },
-            Instance {
-                model: *Mat4::identity().translate(&[-0.4, 0.4, 12.1]),
-            },
-            Instance {
-                model: *Mat4::identity().translate(&[0.4, -0.4, 0.1]),
-            },
+            // Instance {
+            //     model: *Mat4::identity().translate(&[0., -10., 0.]),
+            //     uv_offset: [0., 0.],
+            //     uv_scale: [1., 1.],
+            // },
+            // Instance {
+            //     model: *Mat4::identity().translate(&[-0.4, 0.4, 12.1]),
+            //     uv_offset: [0., 0.],
+            //     uv_scale: [1., 1.],
+            // },
+            // Instance {
+            //     model: *Mat4::identity().translate(&[0.4, -0.4, 0.1]),
+            //     uv_offset: [0., 0.],
+            //     uv_scale: [1., 1.],
+            // },
         ]);
 
         shader.activate();
-        shader.create_texture("sample_texture.png").await?;
-        unsafe {
-            shader.buffer_data_dynamic("instance", self.instances.as_ref().unwrap())?;
-        }
+        shader.create_texture("entities0.png").await?;
         Ok(())
     }
 
     pub fn draw(&mut self, _: f32) -> Result<(), JsValue> {
         let shader = &mut self.shader;
         shader.activate();
-        shader.bind_texture(0, "sample_texture.png")?;
+        shader.bind_texture(0, "entities0.png")?;
         shader.attach_texture(0, 0)?;
+        unsafe {
+            shader.buffer_data_dynamic("instance", self.instances.as_ref().unwrap())?;
+        }
 
         shader.prepare_array_buffers()?;
         shader.preapre_uniform_blocks()?;
