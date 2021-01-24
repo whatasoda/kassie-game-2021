@@ -9,22 +9,20 @@ mod shader;
 mod shaders;
 mod utils;
 
-use crate::entities::get_current_instance_value;
-use crate::entities::sample_batter::SampleEntity;
 use crate::input::set_input_handler;
+use crate::scenes::{SampleScene, SampleSceneContext, Scenes, TestScene, TestSceneContext};
+use crate::scenes::{SceneManager, SceneType};
 use crate::scheduler::start_loop;
 use crate::shader::{ConvertArrayView, ShaderController, SharedContext};
 use crate::shaders::entity_shader::EntityShader;
 use crate::shaders::test::TestShader;
 
-use core::cell::RefCell;
 use num_traits::cast::ToPrimitive;
-// use std::f32::consts::PI;
+use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Performance, WebGl2RenderingContext};
-use webgl_matrix::{Mat4, Matrix};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
 #[cfg(feature = "wee_alloc")]
@@ -34,7 +32,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 static mut PERFORMANCE: Option<Rc<Performance>> = None;
 
 #[repr(C)]
-struct Uniform {
+pub struct Uniform {
     size0: f32,
     size1: f32,
     _pad0: [u32; 2],
@@ -70,6 +68,10 @@ pub async fn start() -> Result<(), JsValue> {
         PERFORMANCE = Some(performance.clone());
     }
 
+    let scene_manager = Rc::new(RefCell::new(SceneManager {
+        type_: SceneType::Test,
+    }));
+
     let shared = SharedContext::new(doc.clone(), ctx.clone());
     shared
         .borrow_mut()
@@ -78,23 +80,35 @@ pub async fn start() -> Result<(), JsValue> {
     let camera = Rc::new(RefCell::new(camera::CameraController::default()));
     let input = set_input_handler(canvas.clone());
 
-    let test = Rc::new(RefCell::new(SampleEntity {
-        start_at: 0.,
-        duration: 600.,
-        model: *Mat4::identity().scale(500.).translate(&[0., 0., -0.2]),
-    }));
-
-    let mut uniform = Uniform {
+    let test_uniform = Rc::new(RefCell::new(Uniform {
         size0: 0.01,
         size1: 0.5,
         _pad0: [0, 0],
-    };
+    }));
 
-    let mut test_shader = TestShader::new(ShaderController::new(shared.clone()))?;
-    test_shader.init().await?;
+    let test_shader = Rc::new(RefCell::new(TestShader::new(ShaderController::new(
+        shared.clone(),
+    ))?));
+    test_shader.borrow_mut().init().await?;
 
     let entity_shader = EntityShader::new(shared.clone())?;
     entity_shader.borrow_mut().init_textures().await?;
+
+    let mut scenes = Scenes {
+        scene_manager: scene_manager.clone(),
+        batting: SampleScene::new(SampleSceneContext {
+            scene_manager: scene_manager.clone(),
+            entity_shader: entity_shader.clone(),
+            camera: camera.clone(),
+            input: input.clone(),
+            shared: shared.clone(),
+        }),
+        test: TestScene::new(TestSceneContext {
+            test_shader: test_shader.clone(),
+            test_uniform: test_uniform.clone(),
+            shared: shared.clone(),
+        }),
+    };
 
     ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
     ctx.depth_func(WebGl2RenderingContext::LEQUAL);
@@ -103,48 +117,22 @@ pub async fn start() -> Result<(), JsValue> {
         WebGl2RenderingContext::SRC_ALPHA,
         WebGl2RenderingContext::ONE_MINUS_SRC_ALPHA,
     );
-    start_loop(window.clone(), move |now| {
-        let shared = shared.borrow();
-        let mut input = input.borrow_mut();
+
+    start_loop(window.clone(), move |time| {
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
         ctx.clear_depth(1.0);
         ctx.clear(
             WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT,
         );
 
-        uniform.size0 = now / 2000.0;
-        unsafe {
-            shared.uniform_buffer_data("uniforms_", &uniform)?;
-        }
-        // test_shader.draw(now)?;
-
-        let mut camera = camera.borrow_mut();
-        camera.view.position = [0., 0., 0.];
-        // let t = ((now % 20000.0) / 20000.0) * 2. * PI;
-        // camera.view.direction = [t.cos(), 0., t.sin()];
-        camera.view.direction = [0., 0., -1.];
-        camera.refresh();
-        unsafe {
-            shared.uniform_buffer_data("camera", &camera.camera)?;
+        if (time / 10000.0) % 2. < 1. {
+            scene_manager.borrow_mut().type_ = SceneType::Batting;
+        } else {
+            scene_manager.borrow_mut().type_ = SceneType::Test;
         }
 
-        let mut shader = entity_shader.borrow_mut();
-        shader.clear();
-        let mut test = test.borrow_mut();
-        if let Some(click) = &input.clicked {
-            test.start_at = click.timestamp;
-        }
-        test.model = *Mat4::identity().scale(500.).translate(&[
-            input.curr_coord.0 * 2.35 - 1.4,
-            -input.curr_coord.1 * 2.3 - 0.,
-            -0.2,
-        ]);
-        shader
-            .instances
-            .push(get_current_instance_value(&*test, now));
-        shader.draw(now)?;
-
-        input.resolve();
+        scenes.render(time)?;
+        input.borrow_mut().resolve();
         Ok(())
     })?;
 
