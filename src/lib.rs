@@ -3,6 +3,7 @@ mod entities;
 mod impls;
 mod input;
 mod log;
+mod scenes;
 mod scheduler;
 mod shader;
 mod shaders;
@@ -10,7 +11,7 @@ mod utils;
 
 use crate::entities::get_current_instance_value;
 use crate::entities::sample_batter::SampleEntity;
-use crate::input::{set_input_handler, InputReceiver};
+use crate::input::set_input_handler;
 use crate::scheduler::start_loop;
 use crate::shader::{ConvertArrayView, Shader, ShaderWrapper, SharedContext};
 use crate::shaders::entity_shader::EntityShader;
@@ -39,12 +40,6 @@ struct Uniform {
     _pad0: [u32; 2],
 }
 impl ConvertArrayView for Uniform {}
-
-impl InputReceiver for SampleEntity {
-    fn onclick(&mut self, time: f32) {
-        self.start_at = time;
-    }
-}
 
 pub fn now() -> f32 {
     unsafe {
@@ -80,10 +75,12 @@ pub async fn start() -> Result<(), JsValue> {
         .borrow_mut()
         .init_uniform_buffers(vec!["uniforms_", "camera"])?;
 
-    let mut camera = camera::CameraController::default();
+    let camera = Rc::new(RefCell::new(camera::CameraController::default()));
+    let input = set_input_handler(canvas.clone());
+
     let test = Rc::new(RefCell::new(SampleEntity {
         start_at: 0.,
-        duration: 1000.,
+        duration: 600.,
         model: *Mat4::identity().scale(500.).translate(&[0., 0., -0.2]),
     }));
 
@@ -92,7 +89,6 @@ pub async fn start() -> Result<(), JsValue> {
         size1: 0.5,
         _pad0: [0, 0],
     };
-    set_input_handler(canvas.as_ref(), test.clone());
 
     let mut test_shader = TestShader::new(Shader::new(shared.clone()))?;
     test_shader.init().await?;
@@ -100,7 +96,6 @@ pub async fn start() -> Result<(), JsValue> {
     let entity_shader = ShaderWrapper::new(shared.clone(), EntityShader {})?;
     entity_shader.borrow_mut().init_textures().await?;
 
-    camera.view.position = [0., 0., 10.];
     ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
     ctx.depth_func(WebGl2RenderingContext::LEQUAL);
     ctx.enable(WebGl2RenderingContext::BLEND);
@@ -110,6 +105,7 @@ pub async fn start() -> Result<(), JsValue> {
     );
     start_loop(window.clone(), move |now| {
         let shared = shared.borrow();
+        let mut input = input.borrow_mut();
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
         ctx.clear_depth(1.0);
         ctx.clear(
@@ -123,20 +119,33 @@ pub async fn start() -> Result<(), JsValue> {
         // test_shader.draw(now)?;
 
         let t = ((now % 20000.0) / 20000.0) * 2. * PI;
+
+        let mut camera = camera.borrow_mut();
         camera.view.position = [0., 0., 0.];
         // camera.view.direction = [t.cos(), 0., t.sin()];
         camera.view.direction = [0., 0., -1.];
         camera.refresh();
-
-        let mut shader = entity_shader.borrow_mut();
-        shader.clear();
-        shader
-            .instances
-            .push(get_current_instance_value(test.borrow(), now));
         unsafe {
             shared.uniform_buffer_data("camera", &camera.camera)?;
         }
+
+        let mut shader = entity_shader.borrow_mut();
+        shader.clear();
+        let mut test = test.borrow_mut();
+        if let Some(click) = &input.clicked {
+            test.start_at = click.timestamp;
+        }
+        test.model = *Mat4::identity().scale(500.).translate(&[
+            input.curr_coord.0 * 2.35 - 1.4,
+            -input.curr_coord.1 * 2.3 - 0.,
+            -0.2,
+        ]);
+        shader
+            .instances
+            .push(get_current_instance_value(&*test, now));
         shader.draw(now)?;
+
+        input.resolve();
         Ok(())
     })?;
 

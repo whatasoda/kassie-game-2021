@@ -1,5 +1,3 @@
-use crate::log;
-use core::cell::Ref;
 pub mod sample_batter;
 
 use crate::shaders::entity_shader::Instance;
@@ -21,7 +19,7 @@ pub trait Renderable {
     fn set_model(&mut self, model: Mat4);
 }
 
-pub fn get_current_instance_value<T>(target: Ref<T>, time: f32) -> Instance
+pub fn get_current_instance_value<T>(target: &T, time: f32) -> Instance
 where
     T: Renderable,
 {
