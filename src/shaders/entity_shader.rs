@@ -1,9 +1,12 @@
-use crate::shader::{Shader, ShaderImpl};
+use crate::shader::{Shader, ShaderController, ShaderImpl};
 use crate::ConvertArrayView;
 
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext;
 use webgl_matrix::Mat4;
+
+pub type EntityShader = Shader<EntityShaderImpl, Instance>;
+pub struct EntityShaderImpl {}
 
 #[repr(C)]
 struct Vertex {
@@ -81,12 +84,14 @@ void main() {
 }
 "#;
 
-pub struct EntityShader {}
-
-impl ShaderImpl for EntityShader {
+impl ShaderImpl for EntityShaderImpl {
     const INSTANCE_CAPACITY: Option<usize> = None;
 
-    fn init(&self, shader: &mut Shader) -> Result<(), JsValue> {
+    fn new() -> Self {
+        Self {}
+    }
+
+    fn init(&self, shader: &mut ShaderController) -> Result<(), JsValue> {
         shader.compile(VERT, FRAG)?;
         shader.bind_uniform_blocks(vec!["camera"])?;
         shader.layout_buffer::<Vertex>("vertex", 0, vec![("position", 2), ("uv", 2)])?;

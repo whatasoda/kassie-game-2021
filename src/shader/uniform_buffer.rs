@@ -1,5 +1,5 @@
 use super::buffer_data::{buffer_data, ConvertArrayView};
-use super::{Shader, SharedContext};
+use super::{ShaderController, SharedContext};
 
 use std::collections::HashMap;
 
@@ -57,7 +57,7 @@ impl UniformBlocks {
     }
 }
 
-impl Shader {
+impl ShaderController {
     pub fn preapre_uniform_blocks(&self) -> Result<(), JsValue> {
         let shared = self.shared.borrow();
         let mut bindings = self.uniforms.bindings.iter();

@@ -13,13 +13,13 @@ use crate::entities::get_current_instance_value;
 use crate::entities::sample_batter::SampleEntity;
 use crate::input::set_input_handler;
 use crate::scheduler::start_loop;
-use crate::shader::{ConvertArrayView, Shader, ShaderWrapper, SharedContext};
+use crate::shader::{ConvertArrayView, ShaderController, SharedContext};
 use crate::shaders::entity_shader::EntityShader;
 use crate::shaders::test::TestShader;
 
 use core::cell::RefCell;
 use num_traits::cast::ToPrimitive;
-use std::f32::consts::PI;
+// use std::f32::consts::PI;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -90,10 +90,10 @@ pub async fn start() -> Result<(), JsValue> {
         _pad0: [0, 0],
     };
 
-    let mut test_shader = TestShader::new(Shader::new(shared.clone()))?;
+    let mut test_shader = TestShader::new(ShaderController::new(shared.clone()))?;
     test_shader.init().await?;
 
-    let entity_shader = ShaderWrapper::new(shared.clone(), EntityShader {})?;
+    let entity_shader = EntityShader::new(shared.clone())?;
     entity_shader.borrow_mut().init_textures().await?;
 
     ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
@@ -118,10 +118,9 @@ pub async fn start() -> Result<(), JsValue> {
         }
         // test_shader.draw(now)?;
 
-        let t = ((now % 20000.0) / 20000.0) * 2. * PI;
-
         let mut camera = camera.borrow_mut();
         camera.view.position = [0., 0., 0.];
+        // let t = ((now % 20000.0) / 20000.0) * 2. * PI;
         // camera.view.direction = [t.cos(), 0., t.sin()];
         camera.view.direction = [0., 0., -1.];
         camera.refresh();

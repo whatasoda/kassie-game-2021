@@ -1,5 +1,5 @@
 use super::buffer_data::{buffer_data, ConvertArrayView};
-use super::Shader;
+use super::ShaderController;
 
 use std::cmp::min;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ impl ArrayBuffers {
     }
 }
 
-impl Shader {
+impl ShaderController {
     fn_ensure_option!(
         [fn ensure_vao],
         arrays.vao,

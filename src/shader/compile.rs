@@ -1,4 +1,4 @@
-use super::Shader;
+use super::ShaderController;
 // use crate::log::*;
 use std::collections::HashMap;
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader, WebGlUniformLocation};
@@ -17,7 +17,7 @@ impl Program {
     }
 }
 
-impl Shader {
+impl ShaderController {
     fn_ensure_option!(
         [pub(super) fn ensure_program],
         program.program,

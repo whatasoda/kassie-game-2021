@@ -31,7 +31,7 @@ impl SharedContext {
     }
 }
 
-pub struct Shader {
+pub struct ShaderController {
     pub shared: Rc<RefCell<SharedContext>>,
     program: compile::Program,
     arrays: array_buffer::ArrayBuffers,
@@ -39,9 +39,9 @@ pub struct Shader {
     textures: texture::Textures,
 }
 
-impl Shader {
+impl ShaderController {
     pub fn new(shared: Rc<RefCell<SharedContext>>) -> Self {
-        Shader {
+        Self {
             shared,
             program: compile::Program::empty(),
             arrays: array_buffer::ArrayBuffers::empty(),
@@ -53,10 +53,13 @@ impl Shader {
 
 pub trait ShaderImpl {
     const INSTANCE_CAPACITY: Option<usize>;
-    fn init(&self, shader: &mut Shader) -> Result<(), JsValue>;
+    fn new() -> Self;
+    fn init(&self, shader: &mut ShaderController) -> Result<(), JsValue>;
     fn get_texture_map(&self) -> Vec<(u32, u32, &'static str)>;
     fn draw(&self, ctx: &WebGl2RenderingContext, time: f32, instance_len: i32);
 }
+
+pub type Shader<T, I> = ShaderWrapper<T, I>;
 
 pub struct ShaderWrapper<T, I>
 where
@@ -64,7 +67,7 @@ where
     I: Sized,
 {
     implementation: T,
-    pub controller: Shader,
+    pub controller: ShaderController,
     pub instances: Vec<I>,
 }
 
@@ -73,11 +76,9 @@ where
     T: ShaderImpl,
     I: Sized,
 {
-    pub fn new(
-        shared: Rc<RefCell<SharedContext>>,
-        implementation: T,
-    ) -> Result<Rc<RefCell<Self>>, JsValue> {
-        let mut controller = Shader::new(shared);
+    pub fn new(shared: Rc<RefCell<SharedContext>>) -> Result<Rc<RefCell<Shader<T, I>>>, JsValue> {
+        let mut controller = ShaderController::new(shared);
+        let implementation = T::new();
         implementation.init(&mut controller)?;
         Ok(Rc::new(RefCell::new(ShaderWrapper {
             implementation,

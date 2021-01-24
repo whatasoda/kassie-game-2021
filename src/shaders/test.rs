@@ -1,5 +1,5 @@
 use crate::shader::ConvertArrayView;
-use crate::shader::Shader;
+use crate::shader::ShaderController;
 
 use wasm_bindgen::JsValue;
 use web_sys::WebGl2RenderingContext;
@@ -18,7 +18,7 @@ struct Instance {
 }
 
 pub struct TestShader {
-    pub shader: Shader,
+    pub shader: ShaderController,
     instances: Option<Vec<Instance>>,
 }
 
@@ -85,7 +85,7 @@ void main() {
     outColor = vec4(((tex_color.xyz * tex_color.a) + rainbow) * v_mask, 1.0);
 }
 "#;
-    pub fn new(mut shader: Shader) -> Result<Self, JsValue> {
+    pub fn new(mut shader: ShaderController) -> Result<Self, JsValue> {
         VERTICES.as_ptr();
         shader.compile(Self::VERT, Self::FRAG)?;
         shader.bind_uniform_blocks(vec!["uniforms_"])?;
@@ -137,12 +137,12 @@ void main() {
         shader.attach_texture(0, 0)?;
         shader.prepare_array_buffers()?;
         shader.preapre_uniform_blocks()?;
-        // shader.shared.borrow().ctx.draw_arrays_instanced(
-        //     WebGl2RenderingContext::TRIANGLES,
-        //     0,
-        //     VERTICES.len() as i32,
-        //     self.instances.as_ref().unwrap().len() as i32,
-        // );
+        shader.shared.borrow().ctx.draw_arrays_instanced(
+            WebGl2RenderingContext::TRIANGLES,
+            0,
+            VERTICES.len() as i32,
+            self.instances.as_ref().unwrap().len() as i32,
+        );
         Ok(())
     }
 }

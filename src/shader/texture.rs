@@ -1,4 +1,4 @@
-use super::Shader;
+use super::ShaderController;
 use web_sys::WebGlProgram;
 
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ impl Textures {
     }
 }
 
-impl Shader {
+impl ShaderController {
     pub async fn create_texture<'a>(&'a mut self, src: &'static str) -> Result<(), JsValue> {
         if self.textures.cache_tex.contains_key(src) {
             return Ok(());
