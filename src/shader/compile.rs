@@ -26,25 +26,18 @@ impl Shader {
     );
 
     pub fn activate(&self) {
-        self.ctx.use_program(self.program.program.as_ref());
+        let shared = self.shared.borrow();
+        shared.ctx.use_program(self.program.program.as_ref());
     }
 
     pub fn compile(&mut self, vert: &str, frag: &str) -> Result<(), String> {
         self.ensure_program(None)?;
-
-        let vert = compile_shader(
-            self.ctx.as_ref(),
-            WebGl2RenderingContext::VERTEX_SHADER,
-            vert,
-        )?;
-        let frag = compile_shader(
-            self.ctx.as_ref(),
-            WebGl2RenderingContext::FRAGMENT_SHADER,
-            frag,
-        )?;
-        let program = link_program(self.ctx.as_ref(), &vert, &frag)?;
-
-        self.program.program = Some(program);
+        self.program.program = Some({
+            let shared = self.shared.borrow();
+            let vert = compile_shader(&shared.ctx, WebGl2RenderingContext::VERTEX_SHADER, vert)?;
+            let frag = compile_shader(&shared.ctx, WebGl2RenderingContext::FRAGMENT_SHADER, frag)?;
+            link_program(&shared.ctx, &vert, &frag)?
+        });
         self.init_buffers()?;
         Ok(())
     }

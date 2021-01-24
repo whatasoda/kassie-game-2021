@@ -12,7 +12,7 @@ use crate::entities::get_current_instance_value;
 use crate::entities::sample_batter::SampleEntity;
 use crate::input::{set_input_handler, InputReceiver};
 use crate::scheduler::start_loop;
-use crate::shader::{ConvertArrayView, Shader, ShaderWrapper};
+use crate::shader::{ConvertArrayView, Shader, ShaderWrapper, SharedContext};
 use crate::shaders::entity_shader::EntityShader;
 use crate::shaders::test::TestShader;
 
@@ -75,6 +75,11 @@ pub async fn start() -> Result<(), JsValue> {
         PERFORMANCE = Some(performance.clone());
     }
 
+    let shared = SharedContext::new(doc.clone(), ctx.clone());
+    shared
+        .borrow_mut()
+        .init_uniform_buffers(vec!["uniforms_", "camera"])?;
+
     let mut camera = camera::CameraController::default();
     let test = Rc::new(RefCell::new(SampleEntity {
         start_at: 0.,
@@ -89,10 +94,10 @@ pub async fn start() -> Result<(), JsValue> {
     };
     set_input_handler(canvas.as_ref(), test.clone());
 
-    let mut test_shader = TestShader::new(Shader::new(doc.clone(), ctx.clone()))?;
+    let mut test_shader = TestShader::new(Shader::new(shared.clone()))?;
     test_shader.init().await?;
 
-    let entity_shader = ShaderWrapper::new(doc.clone(), ctx.clone(), EntityShader {})?;
+    let entity_shader = ShaderWrapper::new(shared.clone(), EntityShader {})?;
     entity_shader.borrow_mut().init_textures().await?;
 
     camera.view.position = [0., 0., 10.];
@@ -104,6 +109,7 @@ pub async fn start() -> Result<(), JsValue> {
         WebGl2RenderingContext::ONE_MINUS_SRC_ALPHA,
     );
     start_loop(window.clone(), move |now| {
+        let shared = shared.borrow();
         ctx.clear_color(0.0, 0.0, 0.0, 1.0);
         ctx.clear_depth(1.0);
         ctx.clear(
@@ -112,9 +118,7 @@ pub async fn start() -> Result<(), JsValue> {
 
         uniform.size0 = now / 2000.0;
         unsafe {
-            test_shader
-                .shader
-                .uniform_buffer_data("uniforms_", &uniform)?;
+            shared.uniform_buffer_data("uniforms_", &uniform)?;
         }
         // test_shader.draw(now)?;
 
@@ -130,9 +134,7 @@ pub async fn start() -> Result<(), JsValue> {
             .instances
             .push(get_current_instance_value(test.borrow(), now));
         unsafe {
-            shader
-                .controller
-                .uniform_buffer_data("camera", &camera.camera)?;
+            shared.uniform_buffer_data("camera", &camera.camera)?;
         }
         shader.draw(now)?;
         Ok(())

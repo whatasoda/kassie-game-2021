@@ -8,15 +8,31 @@ mod texture;
 mod uniform_buffer;
 
 pub use buffer_data::ConvertArrayView;
+use uniform_buffer::UniformBuffers;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{Document, WebGl2RenderingContext};
 
-pub struct Shader {
-    doc: Rc<Document>,
+pub struct SharedContext {
+    pub doc: Rc<Document>,
     pub ctx: Rc<WebGl2RenderingContext>,
+    uniform_buffers: UniformBuffers,
+}
+
+impl SharedContext {
+    pub fn new(doc: Rc<Document>, ctx: Rc<WebGl2RenderingContext>) -> Rc<RefCell<SharedContext>> {
+        Rc::new(RefCell::new(SharedContext {
+            doc,
+            ctx,
+            uniform_buffers: UniformBuffers::new(),
+        }))
+    }
+}
+
+pub struct Shader {
+    pub shared: Rc<RefCell<SharedContext>>,
     program: compile::Program,
     arrays: array_buffer::ArrayBuffers,
     uniforms: uniform_buffer::UniformBlocks,
@@ -24,10 +40,9 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn new(doc: Rc<Document>, ctx: Rc<WebGl2RenderingContext>) -> Self {
+    pub fn new(shared: Rc<RefCell<SharedContext>>) -> Self {
         Shader {
-            doc,
-            ctx,
+            shared,
             program: compile::Program::empty(),
             arrays: array_buffer::ArrayBuffers::empty(),
             uniforms: uniform_buffer::UniformBlocks::empty(),
@@ -40,7 +55,7 @@ pub trait ShaderImpl {
     const INSTANCE_CAPACITY: Option<usize>;
     fn init(&self, shader: &mut Shader) -> Result<(), JsValue>;
     fn get_texture_map(&self) -> Vec<(u32, u32, &'static str)>;
-    fn draw(&self, shader: &mut Shader, time: f32, instance_len: i32) -> Result<(), JsValue>;
+    fn draw(&self, ctx: &WebGl2RenderingContext, time: f32, instance_len: i32);
 }
 
 pub struct ShaderWrapper<T, I>
@@ -59,11 +74,10 @@ where
     I: Sized,
 {
     pub fn new(
-        doc: Rc<Document>,
-        ctx: Rc<WebGl2RenderingContext>,
+        shared: Rc<RefCell<SharedContext>>,
         implementation: T,
     ) -> Result<Rc<RefCell<Self>>, JsValue> {
-        let mut controller = Shader::new(doc, ctx);
+        let mut controller = Shader::new(shared);
         implementation.init(&mut controller)?;
         Ok(Rc::new(RefCell::new(ShaderWrapper {
             implementation,
@@ -97,8 +111,13 @@ where
             self.controller
                 .buffer_data_dynamic("instance", &self.instances)?;
         }
-        self.implementation
-            .draw(&mut self.controller, time, self.instances.len() as i32)?;
+        self.controller.prepare_array_buffers()?;
+        self.controller.preapre_uniform_blocks()?;
+        self.implementation.draw(
+            &self.controller.shared.borrow().ctx,
+            time,
+            self.instances.len() as i32,
+        );
         Ok(())
     }
 }

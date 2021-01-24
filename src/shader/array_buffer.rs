@@ -30,16 +30,18 @@ impl Shader {
     );
     fn_ensure_hashmap!(
         [fn ensure_array_buffer],
-        arrays.buffers,
+        [arrays.buffers],
         if_none: "array buffer uninitialized",
         if_some: "array buffer already exists",
     );
 
     pub(super) fn init_buffers(&mut self) -> Result<(), String> {
         self.ensure_vao(None)?;
+        let shared = self.shared.borrow();
 
         self.arrays.vao = Some(
-            self.ctx
+            shared
+                .ctx
                 .create_vertex_array()
                 .ok_or("failed to create vao")?,
         );
@@ -48,8 +50,9 @@ impl Shader {
 
     pub fn prepare_array_buffers(&self) -> Result<(), String> {
         self.ensure_vao(Some(()))?;
+        let shared = self.shared.borrow();
 
-        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
+        shared.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         Ok(())
     }
 
@@ -65,15 +68,16 @@ impl Shader {
         self.ensure_vao(Some(()))?;
         self.ensure_program(Some(()))?;
         self.ensure_array_buffer(name, None)?;
+        let shared = self.shared.borrow();
 
-        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
+        shared.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         let buffer = create_buffer_with_layout::<T>(
-            self.ctx.as_ref(),
+            &shared.ctx,
             &self.program.program.as_ref().unwrap(),
             divisor,
             layout,
         )?;
-        self.ctx.bind_vertex_array(None);
+        shared.ctx.bind_vertex_array(None);
         self.arrays.buffers.insert(name, buffer);
         Ok(())
     }
@@ -103,17 +107,18 @@ impl Shader {
     {
         self.ensure_vao(Some(()))?;
         self.ensure_array_buffer(name, Some(()))?;
+        let shared = self.shared.borrow();
 
-        self.ctx.bind_vertex_array(self.arrays.vao.as_ref());
+        shared.ctx.bind_vertex_array(self.arrays.vao.as_ref());
         let buffer = self.arrays.buffers.get(name).unwrap();
         buffer_data(
-            self.ctx.as_ref(),
+            &shared.ctx,
             WebGl2RenderingContext::ARRAY_BUFFER,
             Some(buffer),
             data,
             is_dynamic,
         );
-        self.ctx.bind_vertex_array(None);
+        shared.ctx.bind_vertex_array(None);
         Ok(())
     }
 }

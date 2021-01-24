@@ -105,15 +105,12 @@ impl ShaderImpl for EntityShader {
         vec![(0, 0, "entities0.png")]
     }
 
-    fn draw(&self, shader: &mut Shader, _: f32, instance_len: i32) -> Result<(), JsValue> {
-        shader.prepare_array_buffers()?;
-        shader.preapre_uniform_blocks()?;
-        shader.ctx.draw_arrays_instanced(
+    fn draw(&self, ctx: &WebGl2RenderingContext, _: f32, instance_len: i32) {
+        ctx.draw_arrays_instanced(
             WebGl2RenderingContext::TRIANGLES,
             0,
             VERTICES.len() as i32,
             instance_len,
         );
-        Ok(())
     }
 }

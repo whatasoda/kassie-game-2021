@@ -137,12 +137,12 @@ void main() {
         shader.attach_texture(0, 0)?;
         shader.prepare_array_buffers()?;
         shader.preapre_uniform_blocks()?;
-        shader.ctx.draw_arrays_instanced(
-            WebGl2RenderingContext::TRIANGLES,
-            0,
-            VERTICES.len() as i32,
-            self.instances.as_ref().unwrap().len() as i32,
-        );
+        // shader.shared.borrow().ctx.draw_arrays_instanced(
+        //     WebGl2RenderingContext::TRIANGLES,
+        //     0,
+        //     VERTICES.len() as i32,
+        //     self.instances.as_ref().unwrap().len() as i32,
+        // );
         Ok(())
     }
 }

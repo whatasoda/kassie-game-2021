@@ -28,22 +28,25 @@ impl Shader {
         if self.textures.cache_tex.contains_key(src) {
             return Ok(());
         }
+        let shared = self.shared.borrow();
         if !self.textures.cache_img.contains_key(src) {
             self.textures
                 .cache_img
-                .insert(src, load_image(self.doc.as_ref(), src).await?);
+                .insert(src, load_image(&shared.doc, src).await?);
         }
         let img = self.textures.cache_img.get(src);
         let img = img.as_ref().unwrap();
-        let tex = self
+        let tex = shared
             .ctx
             .create_texture()
             .ok_or("failed to create texture")?;
 
-        self.ctx
+        shared
+            .ctx
             .bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(&tex));
         self.textures.cache_tex.insert(src, tex);
-        self.ctx
+        shared
+            .ctx
             .tex_image_2d_with_u32_and_u32_and_html_image_element(
                 WebGl2RenderingContext::TEXTURE_2D,
                 0,
@@ -52,20 +55,25 @@ impl Shader {
                 WebGl2RenderingContext::UNSIGNED_BYTE,
                 img,
             )?;
-        self.ctx.generate_mipmap(WebGl2RenderingContext::TEXTURE_2D);
+        shared
+            .ctx
+            .generate_mipmap(WebGl2RenderingContext::TEXTURE_2D);
 
         Ok(())
     }
 
     pub fn bind_texture(&self, tex_slot: u32, src: &str) -> Result<(), JsValue> {
         let tex = self.textures.cache_tex.get(src).ok_or("unknown texture")?;
+        let shared = self.shared.borrow();
         if tex_slot > 31 {
             Err("texture slot out of range")?;
         }
 
-        self.ctx
+        shared
+            .ctx
             .active_texture(WebGl2RenderingContext::TEXTURE0 + tex_slot);
-        self.ctx
+        shared
+            .ctx
             .bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(&tex));
 
         Ok(())
@@ -76,14 +84,15 @@ impl Shader {
         if tex_slot > 31 {
             Err("texture slot out of range")?;
         }
+        let shared = self.shared.borrow();
 
         let loc = get_tex_uniform_location(
-            self.ctx.as_ref(),
+            &shared.ctx,
             self.program.program.as_ref().unwrap(),
             &mut self.textures.uniforms,
             tex_id,
         )?;
-        self.ctx.uniform1i(Some(loc), tex_slot as i32);
+        shared.ctx.uniform1i(Some(loc), tex_slot as i32);
 
         Ok(())
     }
