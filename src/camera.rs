@@ -1,5 +1,6 @@
 use crate::impls::matrix::ViewMatrix;
 use crate::ConvertArrayView;
+use std::f32::consts::PI;
 use webgl_matrix::{Mat4, Matrix, ProjectionMatrix, Vec3};
 
 #[repr(C)]
@@ -70,10 +71,10 @@ pub struct Projection {
 }
 impl Default for Projection {
     fn default() -> Self {
-        let fov_y = 40.;
+        let fov_y = PI * 0.15;
         let aspect_retio = 1.;
-        let near = 0.001;
-        let far = 100000.;
+        let near = 0.1;
+        let far = 100.;
         Self {
             matrix: Mat4::create_perspective(fov_y, aspect_retio, near, far),
             fov_y,

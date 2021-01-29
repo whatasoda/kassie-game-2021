@@ -2,7 +2,7 @@ pub mod sample_batter;
 
 use crate::shaders::entity_shader::Instance;
 
-use webgl_matrix::{Mat4, Matrix};
+use webgl_matrix::Mat4;
 
 #[derive(Clone)]
 pub struct Frame {
@@ -48,27 +48,10 @@ where
             .1
             .clone()
     });
-    let scale = [
-        uv_scale[0],
-        0.,
-        0.,
-        0.,
-        0.,
-        uv_scale[1],
-        0.,
-        0.,
-        0.,
-        0.,
-        1.,
-        0.,
-        uv_scale[0] * pos_offset[0],
-        uv_scale[1] * pos_offset[1],
-        0.,
-        1.,
-    ];
     Instance {
-        model: *target.model().clone().mul(&scale),
+        model: target.model(),
         uv_offset,
         uv_scale,
+        pos_offset,
     }
 }

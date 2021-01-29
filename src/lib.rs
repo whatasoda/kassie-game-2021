@@ -14,6 +14,7 @@ use crate::scenes::{SampleScene, SampleSceneContext, Scenes, TestScene, TestScen
 use crate::scenes::{SceneManager, SceneType};
 use crate::scheduler::start_loop;
 use crate::shader::{ConvertArrayView, ShaderController, SharedContext};
+use crate::shaders::background_shader::BackgroundShader;
 use crate::shaders::entity_shader::EntityShader;
 use crate::shaders::test::TestShader;
 
@@ -75,7 +76,7 @@ pub async fn start() -> Result<(), JsValue> {
     let shared = SharedContext::new(doc.clone(), ctx.clone());
     shared
         .borrow_mut()
-        .init_uniform_buffers(vec!["uniforms_", "camera"])?;
+        .init_uniform_buffers(vec!["uniforms_", "camera", "background"])?;
 
     let camera = Rc::new(RefCell::new(camera::CameraController::default()));
     let input = set_input_handler(canvas.clone());
@@ -94,11 +95,15 @@ pub async fn start() -> Result<(), JsValue> {
     let entity_shader = EntityShader::new(shared.clone())?;
     entity_shader.borrow_mut().init_textures().await?;
 
+    let background_shader = BackgroundShader::new(shared.clone())?;
+    background_shader.borrow_mut().init_textures().await?;
+
     let mut scenes = Scenes {
         scene_manager: scene_manager.clone(),
         batting: SampleScene::new(SampleSceneContext {
             scene_manager: scene_manager.clone(),
             entity_shader: entity_shader.clone(),
+            background_shader: background_shader.clone(),
             camera: camera.clone(),
             input: input.clone(),
             shared: shared.clone(),
@@ -125,11 +130,11 @@ pub async fn start() -> Result<(), JsValue> {
             WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT,
         );
 
-        if (time / 10000.0) % 2. < 1. {
-            scene_manager.borrow_mut().type_ = SceneType::Batting;
-        } else {
-            scene_manager.borrow_mut().type_ = SceneType::Test;
-        }
+        scene_manager.borrow_mut().type_ = SceneType::Batting;
+        // if (time / 10000.0) % 2. < 1. {
+        // } else {
+        //     scene_manager.borrow_mut().type_ = SceneType::Test;
+        // }
 
         scenes.render(time)?;
         input.borrow_mut().resolve();

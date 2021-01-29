@@ -69,9 +69,9 @@ pub fn set_input_handler(element: Rc<Element>) -> Rc<RefCell<InputState>> {
 fn get_mouse_coord(event: &web_sys::MouseEvent, element: &Element) -> (f32, f32) {
     let offset_x = event.offset_x().to_f32().unwrap();
     let offset_y = event.offset_y().to_f32().unwrap();
-    let width = element.width().to_f32().unwrap() * 0.5;
-    let height = element.height().to_f32().unwrap() * 0.5;
-    let x = (offset_x - width) / width;
-    let y = (offset_y - height) / height;
+    let width = element.width().to_f32().unwrap();
+    let height = element.height().to_f32().unwrap();
+    let x = (2. * offset_x / width) - 1.;
+    let y = 1. - (2. * offset_y / height);
     (x, y)
 }

@@ -19,6 +19,7 @@ pub struct Instance {
     pub model: Mat4,
     pub uv_offset: [f32; 2],
     pub uv_scale: [f32; 2],
+    pub pos_offset: [f32; 2],
 }
 
 impl ConvertArrayView for [Vertex; 6] {}
@@ -56,6 +57,7 @@ layout (location = 1) in vec2 uv;
 layout (location = 2) in mat4 model;
 layout (location = 6) in vec2 uv_offset;
 layout (location = 7) in vec2 uv_scale;
+layout (location = 8) in vec2 pos_offset;
 
 out vec2 v_uv;
 
@@ -66,7 +68,7 @@ layout (std140) uniform camera {
 void main() {
     v_uv = uv_scale * uv + uv_offset;
     mat4 mvp = vpMatrix * model;
-    gl_Position = mvp * vec4(position, 0.0, 1.0);
+    gl_Position = mvp * vec4((position + pos_offset) * uv_scale, 0.0, 1.0);
 }
 "#;
 
@@ -84,11 +86,15 @@ void main() {
 }
 "#;
 
-impl ShaderImpl for EntityShaderImpl {
+impl ShaderImpl<Instance> for EntityShaderImpl {
     const INSTANCE_CAPACITY: Option<usize> = None;
 
     fn new() -> Self {
         Self {}
+    }
+
+    fn get_static_instances(&self) -> Option<Vec<Instance>> {
+        None
     }
 
     fn init(&self, shader: &mut ShaderController) -> Result<(), JsValue> {
@@ -98,7 +104,12 @@ impl ShaderImpl for EntityShaderImpl {
         shader.layout_buffer::<Instance>(
             "instance",
             1,
-            vec![("model", 16), ("uv_offset", 2), ("uv_scale", 2)],
+            vec![
+                ("model", 16),
+                ("uv_offset", 2),
+                ("uv_scale", 2),
+                ("pos_offset", 2),
+            ],
         )?;
         unsafe {
             shader.buffer_data_static("vertex", &VERTICES)?;
