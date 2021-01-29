@@ -10,7 +10,7 @@ mod uniform_buffer;
 pub use buffer_data::ConvertArrayView;
 use uniform_buffer::UniformBuffers;
 
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use web_sys::{Document, WebGl2RenderingContext};
@@ -51,10 +51,14 @@ impl ShaderController {
     }
 }
 
-pub trait ShaderImpl {
+pub trait ShaderImpl<I>
+where
+    I: Sized,
+{
     const INSTANCE_CAPACITY: Option<usize>;
     fn new() -> Self;
     fn init(&self, shader: &mut ShaderController) -> Result<(), JsValue>;
+    fn get_static_instances(&self) -> Option<Vec<I>>;
     fn get_texture_map(&self) -> Vec<(u32, u32, &'static str)>;
     fn draw(&self, ctx: &WebGl2RenderingContext, time: f32, instance_len: i32);
 }
@@ -63,30 +67,45 @@ pub type Shader<T, I> = ShaderWrapper<T, I>;
 
 pub struct ShaderWrapper<T, I>
 where
-    T: ShaderImpl,
+    T: ShaderImpl<I>,
     I: Sized,
 {
     implementation: T,
     pub controller: ShaderController,
-    pub instances: Vec<I>,
+    instances: Rc<RefCell<Vec<I>>>,
+    is_static_instance: bool,
 }
 
 impl<T, I> ShaderWrapper<T, I>
 where
-    T: ShaderImpl,
+    T: ShaderImpl<I>,
     I: Sized,
 {
     pub fn new(shared: Rc<RefCell<SharedContext>>) -> Result<Rc<RefCell<Shader<T, I>>>, JsValue> {
         let mut controller = ShaderController::new(shared);
         let implementation = T::new();
         implementation.init(&mut controller)?;
+        let (instances, is_static_instance) = match implementation.get_static_instances() {
+            Some(instances) => (
+                unsafe {
+                    controller.buffer_data_static("instance", &instances)?;
+                    instances
+                },
+                true,
+            ),
+            None => (
+                match T::INSTANCE_CAPACITY {
+                    Some(capacity) => Vec::with_capacity(capacity),
+                    None => Vec::new(),
+                },
+                false,
+            ),
+        };
         Ok(Rc::new(RefCell::new(ShaderWrapper {
             implementation,
             controller,
-            instances: match T::INSTANCE_CAPACITY {
-                Some(capacity) => Vec::with_capacity(capacity),
-                None => Vec::new(),
-            },
+            is_static_instance,
+            instances: Rc::new(RefCell::new(instances)),
         })))
     }
 
@@ -99,7 +118,17 @@ where
     }
 
     pub fn clear(&mut self) {
-        self.instances.clear();
+        if !self.is_static_instance {
+            self.instances.borrow_mut().clear();
+        }
+    }
+
+    pub fn instances(&self) -> Ref<'_, Vec<I>> {
+        self.instances.borrow()
+    }
+
+    pub fn instances_mut(&self) -> RefMut<'_, Vec<I>> {
+        self.instances.borrow_mut()
     }
 
     pub fn draw(&mut self, time: f32) -> Result<(), JsValue> {
@@ -108,16 +137,19 @@ where
             self.controller.bind_texture(tex_slot, filename)?;
             self.controller.attach_texture(tex_id, tex_slot)?;
         }
-        unsafe {
-            self.controller
-                .buffer_data_dynamic("instance", &self.instances)?;
+        let instances = self.instances.borrow();
+        if !self.is_static_instance {
+            unsafe {
+                self.controller
+                    .buffer_data_dynamic("instance", &*instances)?;
+            }
         }
         self.controller.prepare_array_buffers()?;
         self.controller.preapre_uniform_blocks()?;
         self.implementation.draw(
             &self.controller.shared.borrow().ctx,
             time,
-            self.instances.len() as i32,
+            instances.len() as i32,
         );
         Ok(())
     }
