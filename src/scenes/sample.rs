@@ -1,15 +1,17 @@
+use crate::bezier::{BezierTrajectory, Curve};
 use crate::camera::CameraController;
-use crate::entities::get_current_instance_value;
 use crate::entities::sample_batter::SampleEntity;
+use crate::entities::thrown_ball::ThrownBall;
+use crate::entities::{get_current_instance_value, Renderable};
 use crate::input::InputState;
 use crate::log;
 use crate::scenes::SceneManager;
 use crate::shader::SharedContext;
 use crate::shaders::background_shader::{Background, BackgroundShader};
 use crate::shaders::entity_shader::EntityShader;
-use std::f32::consts::PI;
 
 use std::cell::RefCell;
+use std::f32::consts::PI;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use webgl_matrix::{Mat4, Matrix, MulVectorMatrix, Vector};
@@ -27,6 +29,7 @@ pub struct SampleScene {
     context: SampleSceneContext,
     batter: SampleEntity,
     background: Background,
+    ball: ThrownBall,
     vp_inv: Mat4,
 }
 
@@ -34,19 +37,27 @@ impl SampleScene {
     pub fn new(context: SampleSceneContext) -> Self {
         Self {
             context,
-            batter: SampleEntity {
-                start_at: 0.,
-                duration: 600.,
-                model: Mat4::zeros(),
-            },
+            batter: SampleEntity::new(600.),
             background: Background {
                 model: [
-                    6., 0., 0., 0., //
-                    0., 6., 0., 0., //
-                    0., 0., -7., 0., //
-                    0., -1., -1.75, 1., //
+                    9., 0., 0., 0., //
+                    0., 9., 0., 0., //
+                    0., 0., -10., 0., //
+                    0., -1., -3., 1., //
                 ],
             },
+            ball: ThrownBall::new(BezierTrajectory::new(
+                true,
+                vec![Curve {
+                    rate_coef: 0.1,
+                    rate_1: 0.3333,
+                    rate_2: 0.6666,
+                    p_0: [0., -0.5, -0.2],
+                    p_1: [0., -0.8, 2.],
+                    p_2: [0., -0.6, 2.5],
+                    p_3: [0., -0.5, 2.8],
+                }],
+            )),
             vp_inv: Mat4::zeros(),
         }
     }
@@ -74,8 +85,10 @@ impl SampleScene {
         background_shader.draw(time)?;
 
         entity_shader.clear();
+        self.ball.next()?;
+
         if let Some(click) = &input.clicked {
-            self.batter.start_at = click.timestamp;
+            self.batter.start(click.timestamp);
         }
 
         self.vp_inv = {
@@ -93,15 +106,17 @@ impl SampleScene {
         let r = r.add(&camera.view.position);
         let r = r.add(&[-0.05, 0.005, 0.]);
 
-        self.batter.model = [
+        self.batter.set_model([
             0.2, 0., 0., 0., //
             0., 0.2, 0., 0., //
             0., 0., 0.2, 0., //
             r[0], r[1], r[2], 1., //
-        ];
-        entity_shader
-            .instances_mut()
-            .push(get_current_instance_value(&self.batter, time));
+        ]);
+        {
+            let mut instances = entity_shader.instances_mut();
+            instances.push(get_current_instance_value(&self.batter, time));
+            instances.push(get_current_instance_value(&self.ball, time));
+        }
         entity_shader.draw(time)?;
 
         Ok(())

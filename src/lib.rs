@@ -1,3 +1,4 @@
+mod bezier;
 mod camera;
 mod entities;
 mod impls;

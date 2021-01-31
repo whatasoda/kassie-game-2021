@@ -1,16 +1,30 @@
 use super::{Frame, Renderable};
 
-use webgl_matrix::Mat4;
+use webgl_matrix::{Mat4, Matrix};
 
 pub struct SampleEntity {
-    pub start_at: f32,
-    pub duration: f32,
-    pub model: Mat4,
+    duration: f32,
+    start_at: f32,
+    model: Mat4,
 }
 
 const HEIGHT: f32 = 0.2197265625;
 
-// sample_entity_0.png
+impl SampleEntity {
+    pub fn new(duration: f32) -> Self {
+        Self {
+            duration,
+            start_at: f32::MAX,
+            model: Mat4::identity(),
+        }
+    }
+
+    pub fn start(&mut self, time: f32) {
+        self.start_at = time;
+    }
+}
+
+/// sample_entity_0.png
 impl Renderable for SampleEntity {
     const FRAMES: [Option<(f32, Frame)>; 16] = [
         Some((

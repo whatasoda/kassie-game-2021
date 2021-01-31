@@ -1,4 +1,5 @@
 pub mod sample_batter;
+pub mod thrown_ball;
 
 use crate::shaders::entity_shader::Instance;
 

@@ -83,6 +83,9 @@ out vec4 outColor;
 void main() {
     vec4 tex_color = texture(tex0, v_uv);
     outColor = tex_color;
+    float alpha = tex_color.a;
+    float depth = gl_FragCoord.z;
+    gl_FragDepth = (alpha * depth) + (1.0 - alpha);
 }
 "#;
 
