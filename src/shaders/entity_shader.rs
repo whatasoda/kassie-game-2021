@@ -85,6 +85,7 @@ void main() {
     outColor = tex_color;
     float alpha = tex_color.a;
     float depth = gl_FragCoord.z;
+    // TODO: correct formula
     gl_FragDepth = (alpha * depth) + (1.0 - alpha);
 }
 "#;

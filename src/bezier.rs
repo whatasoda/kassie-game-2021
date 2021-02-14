@@ -1,28 +1,41 @@
 use std::iter::Iterator;
 
 #[inline]
-pub fn bezier(t: f32, out: &mut [f32], p_0: &[f32], p_1: &[f32], p_2: &[f32], p_3: &[f32]) {
+fn prepare_t(t: f32) -> (f32, f32, f32, f32) {
     let t2 = t * t;
     let u = 1. - t;
     let u2 = u * u;
+    (
+        u * u2,      //
+        3. * t * u2, //
+        3. * u * t2, //
+        t * t2,      //
+    )
+}
 
-    let t_0 = u * u2;
-    let t_1 = 3. * t * u2;
-    let t_2 = 3. * u * t2;
-    let t_3 = t * t2;
+#[inline]
+pub fn bezier_scalar(t: f32, p: (f32, f32, f32, f32)) -> f32 {
+    let t = prepare_t(t);
+    t.0 * p.0 + t.1 * p.1 + t.2 * p.2 + t.3 * p.3
+}
 
-    for (o, p_0) in out.iter_mut().zip(p_0.iter()) {
-        *o = p_0 * t_0;
+#[inline]
+pub fn bezier_slice(t: f32, out: &mut [f32], p_0: &[f32], p_1: &[f32], p_2: &[f32], p_3: &[f32]) {
+    let t = prepare_t(t);
+
+    let p_01 = p_0.iter().zip(p_1.iter());
+    let p_23 = p_2.iter().zip(p_3.iter());
+
+    for (o, ((p_0, p_1), (p_2, p_3))) in out.iter_mut().zip(p_01.zip(p_23)) {
+        *o = t.0 * p_0 + t.1 * p_1 + t.2 * p_2 + t.3 * p_3;
     }
-    for (o, p_1) in out.iter_mut().zip(p_1.iter()) {
-        *o += p_1 * t_1;
-    }
-    for (o, p_2) in out.iter_mut().zip(p_2.iter()) {
-        *o += p_2 * t_2;
-    }
-    for (o, p_3) in out.iter_mut().zip(p_3.iter()) {
-        *o += p_3 * t_3;
-    }
+}
+
+pub trait ParametricCurveSequence {
+    type Config;
+    fn new(config: Self::Config) -> Self;
+    fn duration(&self) -> f32;
+    fn calc_point(&self, t: f32, loop_enabled: bool) -> Option<[f32; 3]>;
 }
 
 pub struct Curve {
@@ -34,21 +47,27 @@ pub struct Curve {
     pub p_3: [f32; 3],
 }
 
-pub struct BezierGroup {
+pub struct BezierSequence {
     curves: Vec<Curve>,
     t_duration: f32,
 }
 
-impl BezierGroup {
-    pub fn new(curves: Vec<Curve>) -> Self {
+impl ParametricCurveSequence for BezierSequence {
+    type Config = Vec<Curve>;
+
+    fn new(curves: Self::Config) -> Self {
         let mut t_duration = 0.;
-        for curve in curves {
+        for curve in &curves {
             t_duration += curve.t_duration;
         }
         Self { curves, t_duration }
     }
 
-    pub fn calc_point(&self, t: f32, loop_enabled: bool) -> Option<[f32; 3]> {
+    fn duration(&self) -> f32 {
+        self.t_duration
+    }
+
+    fn calc_point(&self, t: f32, loop_enabled: bool) -> Option<[f32; 3]> {
         let t = if t <= self.t_duration {
             t
         } else if loop_enabled {
@@ -70,15 +89,11 @@ impl BezierGroup {
         });
         curve.and_then(|(t, curve)| {
             let t = match curve.t_p {
-                Some((t_p_1, t_p_2)) => {
-                    let mut o = [0.];
-                    bezier(t, &mut o, &[0.], &[t_p_1], &[t_p_2], &[1.]);
-                    o[0]
-                }
+                Some((t_p_1, t_p_2)) => bezier_scalar(t, (0., t_p_1, t_p_2, 1.)),
                 None => t,
             };
             let mut out = [0., 0., 0.];
-            bezier(t, &mut out, &curve.p_0, &curve.p_1, &curve.p_2, &curve.p_3);
+            bezier_slice(t, &mut out, &curve.p_0, &curve.p_1, &curve.p_2, &curve.p_3);
             Some(out)
         })
     }

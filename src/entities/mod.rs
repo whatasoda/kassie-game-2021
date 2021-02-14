@@ -15,16 +15,14 @@ pub struct Frame {
 pub trait Renderable {
     const FRAMES: [Option<(f32, Frame)>; 16];
 
-    fn get_parameter(&self, time: f32) -> f32;
     fn model(&self) -> Mat4;
     fn set_model(&mut self, model: Mat4);
 }
 
-pub fn get_current_instance_value<T>(target: &T, time: f32) -> Instance
+pub fn get_current_instance_value<T>(target: &T, t: f32) -> Instance
 where
     T: Renderable,
 {
-    let t = target.get_parameter(time);
     let frames = T::FRAMES;
     let mut frames = frames.iter();
     let mut frame: Option<Frame> = None;

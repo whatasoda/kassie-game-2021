@@ -1,6 +1,8 @@
 mod bezier;
 mod camera;
+mod configs;
 mod entities;
+mod game_state;
 mod impls;
 mod input;
 mod log;
@@ -10,8 +12,13 @@ mod shader;
 mod shaders;
 mod utils;
 
+use crate::configs::batting::BattingConfigImpl;
+use crate::configs::pitching::PitchingConfigImpl;
+use crate::game_state::batting::BattingImpl;
+use crate::game_state::pitching::PitchingImpl;
+use crate::game_state::{Batting, BattingSceneGameState, Pitching};
 use crate::input::set_input_handler;
-use crate::scenes::{SampleScene, SampleSceneContext, Scenes, TestScene, TestSceneContext};
+use crate::scenes::{SampleScene, SampleSceneContext, TestScene, TestSceneContext};
 use crate::scenes::{SceneManager, SceneType};
 use crate::scheduler::start_loop;
 use crate::shader::{ConvertArrayView, ShaderController, SharedContext};
@@ -99,22 +106,27 @@ pub async fn start() -> Result<(), JsValue> {
     let background_shader = BackgroundShader::new(shared.clone())?;
     background_shader.borrow_mut().init_textures().await?;
 
-    let mut scenes = Scenes {
-        scene_manager: scene_manager.clone(),
-        batting: SampleScene::new(SampleSceneContext {
+    // scene_manager.clone(),
+    let batting = Rc::new(RefCell::new(BattingImpl::new(BattingConfigImpl::default())));
+    let pitching = Rc::new(RefCell::new(PitchingImpl::new(
+        PitchingConfigImpl::default(),
+    )));
+    let mut batting_scene = SampleScene::new(
+        SampleSceneContext {
             scene_manager: scene_manager.clone(),
             entity_shader: entity_shader.clone(),
             background_shader: background_shader.clone(),
             camera: camera.clone(),
             input: input.clone(),
             shared: shared.clone(),
-        }),
-        test: TestScene::new(TestSceneContext {
-            test_shader: test_shader.clone(),
-            test_uniform: test_uniform.clone(),
-            shared: shared.clone(),
-        }),
-    };
+        },
+        BattingSceneGameState::new(batting.clone(), pitching.clone()),
+    );
+    let test = TestScene::new(TestSceneContext {
+        test_shader: test_shader.clone(),
+        test_uniform: test_uniform.clone(),
+        shared: shared.clone(),
+    });
 
     ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
     ctx.depth_func(WebGl2RenderingContext::LEQUAL);
@@ -137,7 +149,7 @@ pub async fn start() -> Result<(), JsValue> {
         //     scene_manager.borrow_mut().type_ = SceneType::Test;
         // }
 
-        scenes.render(time)?;
+        batting_scene.render(time)?;
         input.borrow_mut().resolve();
         Ok(())
     })?;

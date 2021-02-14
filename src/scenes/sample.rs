@@ -1,8 +1,8 @@
-use crate::bezier::{BezierTrajectory, Curve};
 use crate::camera::CameraController;
 use crate::entities::sample_batter::SampleEntity;
 use crate::entities::thrown_ball::ThrownBall;
 use crate::entities::{get_current_instance_value, Renderable};
+use crate::game_state::{Batting, BattingState, GameStateBatting, GameStatePitching, Pitching};
 use crate::input::InputState;
 use crate::log;
 use crate::scenes::SceneManager;
@@ -25,19 +25,27 @@ pub struct SampleSceneContext {
     pub shared: Rc<RefCell<SharedContext>>,
 }
 
-pub struct SampleScene {
+pub struct SampleScene<G>
+where
+    G: GameStateBatting + GameStatePitching,
+{
     context: SampleSceneContext,
+    game_state: G,
     batter: SampleEntity,
     background: Background,
     ball: ThrownBall,
     vp_inv: Mat4,
 }
 
-impl SampleScene {
-    pub fn new(context: SampleSceneContext) -> Self {
+impl<G> SampleScene<G>
+where
+    G: GameStateBatting + GameStatePitching,
+{
+    pub fn new(context: SampleSceneContext, game_state: G) -> Self {
         Self {
             context,
-            batter: SampleEntity::new(600.),
+            game_state,
+            batter: SampleEntity::new(),
             background: Background {
                 model: [
                     9., 0., 0., 0., //
@@ -46,18 +54,7 @@ impl SampleScene {
                     0., -1., -3., 1., //
                 ],
             },
-            ball: ThrownBall::new(BezierTrajectory::new(
-                true,
-                vec![Curve {
-                    rate_coef: 0.1,
-                    rate_1: 0.3333,
-                    rate_2: 0.6666,
-                    p_0: [0., -0.5, -0.2],
-                    p_1: [0., -0.8, 2.],
-                    p_2: [0., -0.6, 2.5],
-                    p_3: [0., -0.5, 2.8],
-                }],
-            )),
+            ball: ThrownBall::new(),
             vp_inv: Mat4::zeros(),
         }
     }
@@ -85,7 +82,6 @@ impl SampleScene {
         background_shader.draw(time)?;
 
         entity_shader.clear();
-        self.ball.next()?;
 
         if let Some(click) = &input.clicked {
             self.batter.start(click.timestamp);
@@ -96,26 +92,63 @@ impl SampleScene {
             mat.inverse();
             mat
         };
+
         let r = [input.curr_coord.0, input.curr_coord.1, -1.0, 1.0];
+
         let r = r.mul_matrix(&self.vp_inv);
         let r = r.scale(1. / r[3]);
         let r = [r[0], r[1], r[2]];
         let r = r.sub(&camera.view.position);
         let r = r.scale(1. / r.mag());
-        let r = r.scale((-0.2 - camera.view.position[1]) / r[1]);
+        let r = r.scale((-0.8 - camera.view.position[1]) / r[1]);
         let r = r.add(&camera.view.position);
-        let r = r.add(&[-0.05, 0.005, 0.]);
+        // let r = r.add(&[-0.05, 0.005, 0.]);
+
+        let mut pitching = self.game_state.pitching_mut();
+        if time % 800. < 10. {
+            pitching.pitch(time);
+        }
+        let pitching_state = pitching.update(time);
+        let ball = pitching_state.ball_position;
+
+        let mut batting = self.game_state.batting_mut();
+        batting.set_batter_position(r);
+        if let Some(click) = &input.clicked {
+            batting.swing(click.timestamp);
+        }
+        let batting_state = batting.update(time, ball);
+
+        let (batter, swing_degree) = match batting_state {
+            BattingState::Idle { batter } => (batter, 0.),
+            BattingState::Swinging {
+                batter,
+                swing_degree,
+            } => (batter, swing_degree),
+            BattingState::Hit(_) => {
+                log::log("aa");
+                return Ok(());
+            }
+        };
+        // log::log_f32(swing_degree);
 
         self.batter.set_model([
-            0.2, 0., 0., 0., //
-            0., 0.2, 0., 0., //
-            0., 0., 0.2, 0., //
-            r[0], r[1], r[2], 1., //
+            0.8, 0., 0., 0., //
+            0., 0.8, 0., 0., //
+            0., 0., 0.8, 0., //
+            batter[0], batter[1], batter[2], 1., //
         ]);
+        if let Some([x, y, z]) = ball {
+            self.ball.set_model([
+                0.8, 0., 0., 0., //
+                0., 0.8, 0., 0., //
+                0., 0., 0.8, 0., //
+                x, y, z, 1., //
+            ]);
+        }
         {
             let mut instances = entity_shader.instances_mut();
-            instances.push(get_current_instance_value(&self.batter, time));
-            instances.push(get_current_instance_value(&self.ball, time));
+            instances.push(get_current_instance_value(&self.batter, swing_degree));
+            instances.push(get_current_instance_value(&self.ball, 0.));
         }
         entity_shader.draw(time)?;
 

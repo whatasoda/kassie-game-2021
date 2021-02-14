@@ -3,7 +3,6 @@ use super::{Frame, Renderable};
 use webgl_matrix::{Mat4, Matrix};
 
 pub struct SampleEntity {
-    duration: f32,
     start_at: f32,
     model: Mat4,
 }
@@ -11,9 +10,8 @@ pub struct SampleEntity {
 const HEIGHT: f32 = 0.2197265625;
 
 impl SampleEntity {
-    pub fn new(duration: f32) -> Self {
+    pub fn new() -> Self {
         Self {
-            duration,
             start_at: f32::MAX,
             model: Mat4::identity(),
         }
@@ -72,9 +70,6 @@ impl Renderable for SampleEntity {
         None,
         None,
     ];
-    fn get_parameter(&self, time: f32) -> f32 {
-        (time - self.start_at) / self.duration
-    }
     fn model(&self) -> Mat4 {
         self.model
     }
